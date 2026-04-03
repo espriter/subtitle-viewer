@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.srt_parser import parse_srt
 
-_SAFE_NAME = re.compile(r"^[a-zA-Z0-9_\-]+(\.[a-zA-Z0-9]+)?$")
+_SAFE_NAME = re.compile(r"^[a-zA-Z0-9_\-]+(\.[a-zA-Z0-9_\-]+)*$")
 
 DEFAULT_SUBTITLES_DIR = Path(__file__).resolve().parent.parent / "subtitles"
 

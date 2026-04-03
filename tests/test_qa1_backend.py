@@ -275,14 +275,14 @@ class TestApiEdgeCases:
 
 class TestUploadSecurity:
 
-    def test_double_extension_rejected(self, upload_client, tmp_path):
-        """malware.py.srt must be rejected (two dots not allowed by _SAFE_NAME)."""
+    def test_double_extension_srt_accepted(self, upload_client, tmp_path):
+        """korean.kor.srt is valid — dots in filenames are allowed if it ends with .srt."""
         (tmp_path / "film").mkdir()
         resp = upload_client.post(
             "/api/movies/film/upload",
-            files={"file": ("malware.py.srt", b"#!/usr/bin/env python\n", "application/octet-stream")},
+            files={"file": ("korean.kor.srt", b"1\n00:00:01,000 --> 00:00:02,000\nHello\n", "application/octet-stream")},
         )
-        assert resp.status_code == 400
+        assert resp.status_code == 201
 
     def test_non_srt_extension_rejected(self, upload_client, tmp_path):
         """Files without .srt extension are rejected."""
