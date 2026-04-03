@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Subtitle Viewer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- View 1: Movie Selection -->
+    <div id="view-movies" class="view active">
+        <header>
+            <h1>Subtitle Viewer</h1>
+        </header>
+        <div id="movie-list" class="card-list"></div>
+    </div>
+
+    <!-- View 2: File Selection -->
+    <div id="view-files" class="view">
+        <header>
+            <button id="btn-back-movies" class="btn-icon">&larr;</button>
+            <h1 id="movie-title"></h1>
+        </header>
+        <p class="hint">Select 1 or 2 subtitle files</p>
+        <div id="file-list" class="card-list"></div>
+        <div id="upload-section">
+            <label class="btn btn-secondary">
+                Upload .srt
+                <input type="file" id="file-upload" accept=".srt" hidden>
+            </label>
+        </div>
+        <button id="btn-start" class="btn btn-primary" disabled>Start</button>
+    </div>
+
+    <!-- View 3: Subtitle Viewer -->
+    <div id="view-reader" class="view">
+        <header>
+            <button id="btn-back-files" class="btn-icon">&larr;</button>
+            <span id="position-indicator">1 / 1</span>
+            <button id="btn-settings" class="btn-icon">&#9881;</button>
+        </header>
+
+        <div id="subtitle-display">
+            <div id="card-primary" class="subtitle-card primary"></div>
+            <div id="card-secondary" class="subtitle-card secondary"></div>
+        </div>
+
+        <nav id="nav-controls">
+            <button id="btn-prev" class="btn-nav">&larr;</button>
+            <button id="btn-next" class="btn-nav">&rarr;</button>
+        </nav>
+
+        <!-- Settings Panel -->
+        <div id="settings-panel" class="panel hidden">
+            <div class="setting-row">
+                <label>Lines per view</label>
+                <div class="btn-group">
+                    <button class="btn-option" data-lines="1">1</button>
+                    <button class="btn-option" data-lines="2">2</button>
+                    <button class="btn-option" data-lines="3">3</button>
+                </div>
+            </div>
+            <div class="setting-row">
+                <label>Navigation mode</label>
+                <div class="btn-group">
+                    <button class="btn-option" data-mode="page">Page</button>
+                    <button class="btn-option" data-mode="slide">Slide</button>
+                </div>
+            </div>
+            <div class="setting-row">
+                <label>Font size</label>
+                <div class="btn-group">
+                    <button id="btn-font-down" class="btn-option">A-</button>
+                    <span id="font-size-display">24px</span>
+                    <button id="btn-font-up" class="btn-option">A+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
