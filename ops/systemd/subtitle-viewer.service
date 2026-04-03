@@ -1,0 +1,19 @@
+[Unit]
+Description=Subtitle Viewer
+After=network.target
+
+[Service]
+Type=simple
+User=espriter
+Group=espriter
+WorkingDirectory=/srv/subtitle-viewer
+ExecStart=/srv/subtitle-viewer/ops/run.sh
+Environment=SUBTITLE_ROOT_PATH=/subtitle
+Environment=SUBTITLE_ENABLE_UPLOAD=true
+Environment=SUBTITLE_HOST=0.0.0.0
+Environment=SUBTITLE_PORT=8091
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
