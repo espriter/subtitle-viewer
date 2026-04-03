@@ -15,6 +15,7 @@
             fontSize: 24,
         },
         uploadEnabled: true,
+        audioFile: null,
     };
 
     // --- API ---
@@ -84,10 +85,12 @@
 
     function saveSession() {
         if (!state.currentMovie || state.selectedFiles.length === 0) return;
+        const audio = $("#audio-player");
         const session = {
             movie: state.currentMovie,
             files: [...state.selectedFiles],
             position: state.position,
+            audioTime: (state.audioFile && audio) ? audio.currentTime : 0,
         };
         localStorage.setItem(SESSION_KEY, JSON.stringify(session));
     }
@@ -123,6 +126,10 @@
         state.currentMovie = session.movie;
         state.selectedFiles = session.files;
 
+        // Detect MP3 audio file for this movie
+        const allFiles = await api.getFiles(state.currentMovie);
+        state.audioFile = allFiles.find(f => f.endsWith('.mp3')) || null;
+
         state.subtitles.primary = await api.getSubtitles(
             state.currentMovie,
             state.selectedFiles[0]
@@ -133,6 +140,10 @@
                 : [];
 
         state.position = Math.min(session.position, state.subtitles.primary.length - 1);
+        setupAudio();
+        if (state.audioFile && session.audioTime) {
+            $("#audio-player").currentTime = session.audioTime;
+        }
         renderSubtitles();
         showView("reader");
     }
@@ -193,8 +204,11 @@
         state.selectedFiles = [];
         $("#movie-title").textContent = movie;
         state.files = await api.getFiles(movie);
+        state.audioFile = state.files.find(f => f.endsWith('.mp3')) || null;
+        state.files = state.files.filter(f => f.endsWith('.srt'));
         renderFileList();
         updateUploadVisibility();
+        updateAudioHint();
         showView("files");
     }
 
@@ -237,6 +251,13 @@
         }
     }
 
+    function updateAudioHint() {
+        const hint = $("#audio-hint");
+        if (hint) {
+            hint.classList.toggle("hidden", !state.audioFile);
+        }
+    }
+
     // --- View 3: Reader ---
     async function startReader() {
         state.subtitles.primary = await api.getSubtitles(
@@ -248,6 +269,7 @@
                 ? await api.getSubtitles(state.currentMovie, state.selectedFiles[1])
                 : [];
         state.position = 0;
+        setupAudio();
         renderSubtitles();
         showView("reader");
     }
@@ -288,6 +310,13 @@
             state.position = newPos;
             renderSubtitles();
         }
+        const audio = $("#audio-player");
+        if (state.audioFile && audio.src && !audio.paused) {
+            const entry = state.subtitles.primary[state.position];
+            if (entry) {
+                audio.currentTime = timeToSeconds(entry.start);
+            }
+        }
     }
 
     // --- Time Jump ---
@@ -297,6 +326,15 @@
         if (parts.length === 3) return +parts[0] * 3600 + +parts[1] * 60 + parseFloat(parts[2]);
         if (parts.length === 2) return +parts[0] * 60 + parseFloat(parts[1]);
         return parseFloat(parts[0]);
+    }
+
+    function findSubtitleAtTime(subs, seconds) {
+        if (!subs || subs.length === 0) return -1;
+        for (let i = subs.length - 1; i >= 0; i--) {
+            const startSec = timeToSeconds(subs[i].start);
+            if (seconds >= startSec) return i;
+        }
+        return -1;
     }
 
     function findNearestSubtitle(subs, targetSeconds) {
@@ -330,6 +368,46 @@
         const feedback = $("#time-jump-feedback");
         feedback.textContent = `→ ${entry.start.split(",")[0]} (#${idx + 1}) 로 이동`;
         feedback.classList.remove("hidden");
+    }
+
+    // --- Audio ---
+    function setupAudio() {
+        const container = $("#audio-container");
+        const audio = $("#audio-player");
+
+        if (!state.audioFile) {
+            container.classList.add("hidden");
+            audio.removeAttribute("src");
+            audio.load();
+            return;
+        }
+
+        const src = `api/movies/${encodeURIComponent(state.currentMovie)}/audio/${encodeURIComponent(state.audioFile)}`;
+        audio.src = src;
+        container.classList.remove("hidden");
+
+        audio.removeEventListener("timeupdate", onTimeUpdate);
+        audio.addEventListener("timeupdate", onTimeUpdate);
+
+        audio.removeEventListener("error", onAudioError);
+        audio.addEventListener("error", onAudioError);
+    }
+
+    function onTimeUpdate() {
+        const audio = $("#audio-player");
+        const t = audio.currentTime;
+        const subs = state.subtitles.primary;
+        const idx = findSubtitleAtTime(subs, t);
+        if (idx >= 0 && idx !== state.position) {
+            state.position = idx;
+            renderSubtitles();
+        }
+    }
+
+    function onAudioError() {
+        console.warn("Audio load failed, falling back to manual mode");
+        $("#audio-container").classList.add("hidden");
+        state.audioFile = null;
     }
 
     // --- Settings ---

@@ -25,6 +25,7 @@
 - 설정: 대사 표시 수(1~3), 넘기기 방식(페이지/슬라이드), 글꼴 크기
 - 웹에서 폴더 생성 + SRT 업로드 (env로 on/off 가능)
 - 스와이프 제스처 + 키보드 화살표 지원
+- MP3 오디오 재생 + 자막 자동 싱크 (MP3 없으면 수동 모드)
 
 ## Directory Structure
 
@@ -35,7 +36,7 @@
 │   ├── srt_parser.py         # SRT parsing logic
 │   ├── upload_router.py      # Upload endpoints (modular, toggleable)
 │   └── static/               # Frontend SPA
-├── tests/                    # 106 tests
+├── tests/                    # 125 tests
 ├── subtitles/                # Runtime data (gitignored)
 │   └── {movie-name}/
 │       ├── en.srt
@@ -54,7 +55,8 @@
 subtitles/
 └── {movie-name}/       # 영화별 폴더 (영문, 숫자, 하이픈, 언더스코어)
     ├── en.srt          # 영어 자막
-    └── ko.srt          # 한국어 자막
+    ├── ko.srt          # 한국어 자막
+    └── audio.mp3       # 오디오 파일 (선택, 서버에서 직접 배치)
 ```
 
 웹 UI에서 폴더 생성 및 SRT 업로드 가능. 또는 서버에서 직접 파일 배치.
@@ -105,7 +107,7 @@ sudo bash /srv/scripts/deploy-subtitle-viewer.sh
 cd /srv/subtitle-viewer
 source venv/bin/activate
 pip install -r requirements.txt
-python -m pytest tests/ -v           # 106 tests
+python -m pytest tests/ -v           # 125 tests
 uvicorn app.main:create_default_app --factory --host 0.0.0.0 --port 8091
 ```
 
@@ -126,3 +128,4 @@ git push -u origin master
 
 - [설계서](superpowers/specs/2026-04-03-subtitle-viewer-design.md)
 - [구현 플랜](superpowers/plans/2026-04-03-subtitle-viewer.md)
+- [오디오 싱크 설계](superpowers/specs/2026-04-03-audio-sync-design.md)

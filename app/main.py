@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.srt_parser import parse_srt
@@ -55,7 +55,7 @@ def create_app(
             raise HTTPException(status_code=404, detail="Movie not found")
         return sorted(
             f.name for f in movie_dir.iterdir()
-            if f.is_file() and f.suffix == ".srt"
+            if f.is_file() and f.suffix in (".srt", ".mp3")
         )
 
     @app.get("/api/movies/{movie}/subtitles/{filename}")
@@ -74,6 +74,21 @@ def create_app(
         except UnicodeDecodeError:
             content = filepath.read_text(encoding="latin-1")
         return parse_srt(content)
+
+    @app.get("/api/movies/{movie}/audio/{filename}")
+    def get_audio(movie: str, filename: str):
+        _validate_name(movie)
+        _validate_name(filename)
+        if not filename.endswith(".mp3"):
+            raise HTTPException(status_code=400, detail="Only .mp3 files allowed")
+        filepath = subs_dir / movie / filename
+        try:
+            is_file = filepath.is_file()
+        except OSError:
+            raise HTTPException(status_code=404, detail="Audio file not found")
+        if not is_file:
+            raise HTTPException(status_code=404, detail="Audio file not found")
+        return FileResponse(filepath, media_type="audio/mpeg", filename=filename)
 
     return app
 
