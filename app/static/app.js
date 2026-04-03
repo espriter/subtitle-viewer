@@ -82,7 +82,7 @@
         });
 
         try {
-            const resp = await fetch("api/movies", { method: "OPTIONS" });
+            const resp = await fetch("api/upload-enabled");
             state.uploadEnabled = resp.ok;
         } catch {
             state.uploadEnabled = false;

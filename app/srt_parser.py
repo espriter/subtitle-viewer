@@ -7,6 +7,8 @@ _TIMECODE_PATTERN = re.compile(
 
 def parse_srt(content: str) -> list[dict]:
     """Parse SRT subtitle content into a list of subtitle entries."""
+    # Strip UTF-8 BOM if present, then normalize all line-ending styles to \n.
+    content = content.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
     blocks = re.split(r"\n\n+", content.strip())
     entries = []
 

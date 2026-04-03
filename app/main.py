@@ -47,7 +47,11 @@ def create_app(
     def list_files(movie: str):
         _validate_name(movie)
         movie_dir = subs_dir / movie
-        if not movie_dir.is_dir():
+        try:
+            is_dir = movie_dir.is_dir()
+        except OSError:
+            raise HTTPException(status_code=404, detail="Movie not found")
+        if not is_dir:
             raise HTTPException(status_code=404, detail="Movie not found")
         return sorted(
             f.name for f in movie_dir.iterdir()
@@ -59,7 +63,11 @@ def create_app(
         _validate_name(movie)
         _validate_name(filename)
         filepath = subs_dir / movie / filename
-        if not filepath.is_file():
+        try:
+            is_file = filepath.is_file()
+        except OSError:
+            raise HTTPException(status_code=404, detail="Subtitle file not found")
+        if not is_file:
             raise HTTPException(status_code=404, detail="Subtitle file not found")
         try:
             content = filepath.read_text(encoding="utf-8")

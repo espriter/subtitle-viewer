@@ -15,6 +15,12 @@ class CreateMovieRequest(BaseModel):
 def create_upload_router(subtitles_dir: Path) -> APIRouter:
     router = APIRouter()
 
+    @router.get("/api/upload-enabled")
+    def upload_enabled():
+        """Sentinel endpoint: present only when upload is enabled.
+        The frontend checks this to show/hide the upload UI."""
+        return {"enabled": True}
+
     @router.post("/api/movies", status_code=201)
     def create_movie(req: CreateMovieRequest):
         if not _SAFE_NAME.match(req.name):
@@ -22,7 +28,11 @@ def create_upload_router(subtitles_dir: Path) -> APIRouter:
         movie_dir = subtitles_dir / req.name
         if movie_dir.exists():
             raise HTTPException(status_code=409, detail="Movie folder already exists")
-        movie_dir.mkdir(parents=True)
+        try:
+            movie_dir.mkdir(parents=True)
+        except FileExistsError:
+            # Another request created the directory between the exists() check and mkdir().
+            raise HTTPException(status_code=409, detail="Movie folder already exists")
         return {"created": req.name}
 
     @router.post("/api/movies/{movie}/upload", status_code=201)
