@@ -68,6 +68,75 @@
         views[name].classList.add("active");
     }
 
+    // --- Home Screen ---
+    function showHomeScreen() {
+        $("#home-screen").classList.remove("hidden");
+        $("#movie-list-section").classList.add("hidden");
+    }
+
+    function showMovieListSection() {
+        $("#home-screen").classList.add("hidden");
+        $("#movie-list-section").classList.remove("hidden");
+    }
+
+    // --- Resume Session ---
+    const SESSION_KEY = "subtitle-viewer-last-session";
+
+    function saveSession() {
+        if (!state.currentMovie || state.selectedFiles.length === 0) return;
+        const session = {
+            movie: state.currentMovie,
+            files: [...state.selectedFiles],
+            position: state.position,
+        };
+        localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    }
+
+    function loadSession() {
+        try {
+            const raw = localStorage.getItem(SESSION_KEY);
+            if (!raw) return null;
+            return JSON.parse(raw);
+        } catch {
+            return null;
+        }
+    }
+
+    function updateResumeCard() {
+        const session = loadSession();
+        const card = $("#menu-resume");
+        const desc = $("#resume-desc");
+        if (!session) {
+            card.classList.add("disabled");
+            desc.textContent = "저장된 세션이 없습니다";
+        } else {
+            card.classList.remove("disabled");
+            const posLabel = session.position + 1;
+            desc.textContent = `${session.movie} — #${posLabel}`;
+        }
+    }
+
+    async function resumeSession() {
+        const session = loadSession();
+        if (!session) return;
+
+        state.currentMovie = session.movie;
+        state.selectedFiles = session.files;
+
+        state.subtitles.primary = await api.getSubtitles(
+            state.currentMovie,
+            state.selectedFiles[0]
+        );
+        state.subtitles.secondary =
+            state.selectedFiles.length > 1
+                ? await api.getSubtitles(state.currentMovie, state.selectedFiles[1])
+                : [];
+
+        state.position = Math.min(session.position, state.subtitles.primary.length - 1);
+        renderSubtitles();
+        showView("reader");
+    }
+
     // --- View 1: Movies ---
     async function loadMovies() {
         state.movies = await api.getMovies();
@@ -88,12 +157,20 @@
             state.uploadEnabled = false;
         }
         updateCreateMovieVisibility();
+        updateMenuCreateFolder();
     }
 
     function updateCreateMovieVisibility() {
         const section = $("#create-movie-section");
         if (section) {
             section.style.display = state.uploadEnabled ? "" : "none";
+        }
+    }
+
+    function updateMenuCreateFolder() {
+        const card = $("#menu-create-folder");
+        if (card) {
+            card.style.display = state.uploadEnabled ? "" : "none";
         }
     }
 
@@ -197,6 +274,8 @@
         const total = state.subtitles.primary.length;
         const current = Math.min(state.position + 1, total);
         $("#position-indicator").textContent = `${current} / ${total}`;
+
+        saveSession();
     }
 
     function navigate(direction) {
@@ -209,6 +288,48 @@
             state.position = newPos;
             renderSubtitles();
         }
+    }
+
+    // --- Time Jump ---
+    function timeToSeconds(timeStr) {
+        // Handle "HH:MM:SS,mmm" or "HH:MM:SS" or "MM:SS"
+        const parts = timeStr.replace(",", ".").split(":");
+        if (parts.length === 3) return +parts[0] * 3600 + +parts[1] * 60 + parseFloat(parts[2]);
+        if (parts.length === 2) return +parts[0] * 60 + parseFloat(parts[1]);
+        return parseFloat(parts[0]);
+    }
+
+    function findNearestSubtitle(subs, targetSeconds) {
+        let closest = 0;
+        let minDiff = Infinity;
+        subs.forEach((entry, i) => {
+            const seconds = timeToSeconds(entry.start);
+            const diff = Math.abs(seconds - targetSeconds);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closest = i;
+            }
+        });
+        return closest;
+    }
+
+    function doTimeJump() {
+        const input = $("#time-jump-input").value.trim();
+        if (!input) return;
+
+        const subs = state.subtitles.primary;
+        if (!subs || subs.length === 0) return;
+
+        const targetSeconds = timeToSeconds(input);
+        const idx = findNearestSubtitle(subs, targetSeconds);
+
+        state.position = idx;
+        renderSubtitles();
+
+        const entry = subs[idx];
+        const feedback = $("#time-jump-feedback");
+        feedback.textContent = `→ ${entry.start.split(",")[0]} (#${idx + 1}) 로 이동`;
+        feedback.classList.remove("hidden");
     }
 
     // --- Settings ---
@@ -293,13 +414,38 @@
 
     // --- Event binding ---
     function bindEvents() {
+        // Home menu cards
+        $("#menu-movie-list").addEventListener("click", () => {
+            showMovieListSection();
+        });
+
+        $("#menu-resume").addEventListener("click", () => {
+            resumeSession();
+        });
+
+        $("#menu-create-folder").addEventListener("click", () => {
+            createMovie();
+        });
+
+        // Back to home from movie list sub-view
+        $("#btn-back-home").addEventListener("click", () => {
+            showHomeScreen();
+        });
+
+        // Back to home (movies view) from file selection
         $("#btn-back-movies").addEventListener("click", () => {
             showView("movies");
-            loadMovies();
+            showMovieListSection();
         });
 
         $("#btn-back-files").addEventListener("click", () => {
             showView("files");
+        });
+
+        $("#btn-home").addEventListener("click", () => {
+            showView("movies");
+            showHomeScreen();
+            loadMovies();
         });
 
         $("#btn-start").addEventListener("click", startReader);
@@ -342,13 +488,19 @@
             saveSettings();
         });
 
+        // Time jump
+        $("#btn-time-jump").addEventListener("click", doTimeJump);
+        $("#time-jump-input").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") doTimeJump();
+        });
+
         // Upload
         const fileUpload = $("#file-upload");
         if (fileUpload) {
             fileUpload.addEventListener("change", () => handleUpload(fileUpload));
         }
 
-        // Create movie folder
+        // Create movie folder (in movie list sub-view)
         const btnCreate = $("#btn-create-movie");
         if (btnCreate) {
             btnCreate.addEventListener("click", createMovie);
@@ -359,10 +511,12 @@
     }
 
     // --- Init ---
-    function init() {
+    async function init() {
         loadSettings();
         bindEvents();
-        loadMovies();
+        showHomeScreen();
+        updateResumeCard();
+        await loadMovies();
     }
 
     document.addEventListener("DOMContentLoaded", init);

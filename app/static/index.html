@@ -7,14 +7,51 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- View 1: Movie Selection -->
+    <!-- View 1: Home Screen -->
     <div id="view-movies" class="view active">
-        <header>
-            <h1>자막 뷰어</h1>
-        </header>
-        <div id="movie-list" class="card-list"></div>
-        <div id="create-movie-section">
-            <button id="btn-create-movie" class="btn btn-secondary">+ 새 폴더 만들기</button>
+        <div id="home-screen">
+            <div class="home-hero">
+                <h1 class="home-title">자막 뷰어</h1>
+                <p class="home-subtitle">영상 자막을 크게 읽고, 두 언어를 비교하세요</p>
+            </div>
+            <div class="home-menu">
+                <div class="menu-card" id="menu-movie-list">
+                    <span class="menu-icon">📂</span>
+                    <div class="menu-text">
+                        <div class="menu-title">영화 목록</div>
+                        <div class="menu-desc">자막 폴더를 선택하세요</div>
+                    </div>
+                    <span class="menu-arrow">›</span>
+                </div>
+                <div class="menu-card" id="menu-resume">
+                    <span class="menu-icon">⏱️</span>
+                    <div class="menu-text">
+                        <div class="menu-title">최근 이어보기</div>
+                        <div class="menu-desc" id="resume-desc">마지막 위치부터 계속</div>
+                    </div>
+                    <span class="menu-arrow">›</span>
+                </div>
+                <div class="menu-card" id="menu-create-folder" style="display:none">
+                    <span class="menu-icon">➕</span>
+                    <div class="menu-text">
+                        <div class="menu-title">새 폴더 만들기</div>
+                        <div class="menu-desc">SRT 자막 업로드</div>
+                    </div>
+                    <span class="menu-arrow">›</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Movie list sub-view (shown when "영화 목록" is clicked) -->
+        <div id="movie-list-section" class="sub-view hidden">
+            <header>
+                <button id="btn-back-home" class="btn-icon">&larr;</button>
+                <h1>영화 목록</h1>
+            </header>
+            <div id="movie-list" class="card-list"></div>
+            <div id="create-movie-section">
+                <button id="btn-create-movie" class="btn btn-secondary">+ 새 폴더 만들기</button>
+            </div>
         </div>
     </div>
 
@@ -41,6 +78,7 @@
             <button id="btn-back-files" class="btn-icon">&larr;</button>
             <span id="position-indicator">1 / 1</span>
             <button id="btn-settings" class="btn-icon">&#9881;</button>
+            <button id="btn-home" class="btn-icon" title="홈으로">&#8962;</button>
         </header>
 
         <div id="subtitle-display">
@@ -78,6 +116,15 @@
                     <button id="btn-font-up" class="btn-option">A+</button>
                 </div>
             </div>
+            <!-- Time Jump -->
+            <div class="setting-row">
+                <label>시간 이동</label>
+                <div class="btn-group time-jump-group">
+                    <input type="text" id="time-jump-input" class="time-jump-input" placeholder="00:30:00" maxlength="12">
+                    <button id="btn-time-jump" class="btn-option">이동</button>
+                </div>
+            </div>
+            <div id="time-jump-feedback" class="time-jump-feedback hidden"></div>
         </div>
     </div>
 
