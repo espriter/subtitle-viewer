@@ -87,6 +87,27 @@
         } catch {
             state.uploadEnabled = false;
         }
+        updateCreateMovieVisibility();
+    }
+
+    function updateCreateMovieVisibility() {
+        const section = $("#create-movie-section");
+        if (section) {
+            section.style.display = state.uploadEnabled ? "" : "none";
+        }
+    }
+
+    async function createMovie() {
+        const name = prompt("새 폴더 이름을 입력하세요 (영문, 숫자, 하이픈, 언더스코어만 가능):");
+        if (!name) return;
+
+        const resp = await api.createMovie(name.trim());
+        if (resp.ok) {
+            await loadMovies();
+        } else {
+            const err = await resp.json();
+            alert(err.detail || "폴더 생성 실패");
+        }
     }
 
     // --- View 2: Files ---
@@ -239,7 +260,7 @@
             renderFileList();
         } else {
             const err = await resp.json();
-            alert(err.detail || "Upload failed");
+            alert(err.detail || "업로드 실패");
         }
         fileInput.value = "";
     }
@@ -325,6 +346,12 @@
         const fileUpload = $("#file-upload");
         if (fileUpload) {
             fileUpload.addEventListener("change", () => handleUpload(fileUpload));
+        }
+
+        // Create movie folder
+        const btnCreate = $("#btn-create-movie");
+        if (btnCreate) {
+            btnCreate.addEventListener("click", createMovie);
         }
 
         setupSwipe();
