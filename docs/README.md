@@ -1,7 +1,31 @@
 # Subtitle Viewer
 
-모바일 환경에서 SRT 자막을 큰 글씨로 읽는 웹앱.
-듀얼 자막(한국어+영어)을 카드 블록으로 동시 표시, 화살표/스와이프로 대사 탐색.
+영상 없이 자막만 빠르게 훑어보고 싶을 때 쓰는 웹앱.
+SRT 파일을 올리면 모바일에서도 큰 글씨로 대사를 넘기며 읽을 수 있고, MP3를 함께 넣으면 오디오와 자막이 자동으로 싱크됩니다.
+
+> This project was vibe-coded with [Claude Code](https://claude.ai/claude-code) (Anthropic).
+
+## Quick Start
+
+Python 3.12+ 환경이면 어디서든 바로 실행할 수 있습니다.
+
+```bash
+git clone https://github.com/espriter/subtitle-viewer.git
+cd subtitle-viewer
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+
+# 자막 폴더 준비 (예시)
+mkdir -p subtitles/my-movie
+cp /path/to/en.srt subtitles/my-movie/
+cp /path/to/ko.srt subtitles/my-movie/
+# (선택) cp /path/to/audio.mp3 subtitles/my-movie/
+
+# 실행
+uvicorn app.main:create_default_app --factory --host 0.0.0.0 --port 8091
+```
+
+브라우저에서 `http://localhost:8091/` 접속. 같은 네트워크의 다른 기기에서는 `http://<서버IP>:8091/` 로 접근합니다.
 
 ## Stack
 
@@ -109,19 +133,6 @@ source venv/bin/activate
 pip install -r requirements.txt
 python -m pytest tests/ -v           # 125 tests
 uvicorn app.main:create_default_app --factory --host 0.0.0.0 --port 8091
-```
-
-## GitHub
-
-아직 remote 미설정. 올리려면:
-```bash
-cd /srv/subtitle-viewer
-gh repo create espriter/subtitle-viewer --private --source=. --push
-```
-또는:
-```bash
-git remote add origin git@github.com:espriter/subtitle-viewer.git
-git push -u origin master
 ```
 
 ## Design Docs
