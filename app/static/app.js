@@ -14,6 +14,7 @@
             navMode: "page",
             fontSize: 24,
             syncOffset: 0,
+            autoSync: true,
         },
         uploadEnabled: true,
         audioFile: null,
@@ -389,6 +390,8 @@
 
         updateMediaSession();
 
+        const autoSyncRow = $("#auto-sync-row");
+        if (autoSyncRow) autoSyncRow.style.display = "";
         const syncRow = $("#sync-offset-row");
         if (syncRow) syncRow.style.display = "";
 
@@ -400,6 +403,7 @@
     }
 
     function onTimeUpdate() {
+        if (!state.settings.autoSync) return;
         const audio = $("#audio-player");
         const t = audio.currentTime + state.settings.syncOffset;
         const subs = state.subtitles.primary;
@@ -471,6 +475,12 @@
         );
         $("#font-size-display").textContent = state.settings.fontSize + "px";
         updateSyncDisplay();
+
+        const syncBtn = $("#btn-auto-sync");
+        if (syncBtn) {
+            syncBtn.textContent = state.settings.autoSync ? "ON" : "OFF";
+            syncBtn.classList.toggle("active", state.settings.autoSync);
+        }
 
         $$("[data-lines]").forEach((btn) => {
             btn.classList.toggle(
@@ -597,6 +607,13 @@
         });
         $("#btn-font-down").addEventListener("click", () => {
             state.settings.fontSize = Math.max(state.settings.fontSize - 2, 14);
+            applySettings();
+            saveSettings();
+        });
+
+        // Auto sync toggle
+        $("#btn-auto-sync").addEventListener("click", () => {
+            state.settings.autoSync = !state.settings.autoSync;
             applySettings();
             saveSettings();
         });
