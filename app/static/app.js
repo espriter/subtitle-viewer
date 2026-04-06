@@ -13,6 +13,7 @@
             linesPerView: 1,
             navMode: "page",
             fontSize: 24,
+            syncOffset: 0,
         },
         uploadEnabled: true,
         audioFile: null,
@@ -388,6 +389,9 @@
 
         updateMediaSession();
 
+        const syncRow = $("#sync-offset-row");
+        if (syncRow) syncRow.style.display = "";
+
         audio.removeEventListener("timeupdate", onTimeUpdate);
         audio.addEventListener("timeupdate", onTimeUpdate);
 
@@ -397,7 +401,7 @@
 
     function onTimeUpdate() {
         const audio = $("#audio-player");
-        const t = audio.currentTime;
+        const t = audio.currentTime + state.settings.syncOffset;
         const subs = state.subtitles.primary;
         const idx = findSubtitleAtTime(subs, t);
         if (idx >= 0 && idx !== state.position) {
@@ -454,12 +458,19 @@
         );
     }
 
+    function updateSyncDisplay() {
+        const val = state.settings.syncOffset;
+        const sign = val > 0 ? "+" : val < 0 ? "" : "±";
+        $("#sync-offset-display").textContent = `${sign}${val.toFixed(1)}s`;
+    }
+
     function applySettings() {
         document.documentElement.style.setProperty(
             "--font-size",
             state.settings.fontSize + "px"
         );
         $("#font-size-display").textContent = state.settings.fontSize + "px";
+        updateSyncDisplay();
 
         $$("[data-lines]").forEach((btn) => {
             btn.classList.toggle(
@@ -587,6 +598,18 @@
         $("#btn-font-down").addEventListener("click", () => {
             state.settings.fontSize = Math.max(state.settings.fontSize - 2, 14);
             applySettings();
+            saveSettings();
+        });
+
+        // Sync offset
+        $("#btn-sync-up").addEventListener("click", () => {
+            state.settings.syncOffset = Math.round((state.settings.syncOffset + 0.5) * 10) / 10;
+            updateSyncDisplay();
+            saveSettings();
+        });
+        $("#btn-sync-down").addEventListener("click", () => {
+            state.settings.syncOffset = Math.round((state.settings.syncOffset - 0.5) * 10) / 10;
+            updateSyncDisplay();
             saveSettings();
         });
 
