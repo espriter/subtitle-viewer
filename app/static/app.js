@@ -386,6 +386,8 @@
         audio.src = src;
         container.classList.remove("hidden");
 
+        updateMediaSession();
+
         audio.removeEventListener("timeupdate", onTimeUpdate);
         audio.addEventListener("timeupdate", onTimeUpdate);
 
@@ -408,6 +410,28 @@
         console.warn("Audio load failed, falling back to manual mode");
         $("#audio-container").classList.add("hidden");
         state.audioFile = null;
+    }
+
+    function updateMediaSession() {
+        if (!("mediaSession" in navigator) || !state.audioFile) return;
+
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: state.currentMovie || "자막 뷰어",
+            artist: "자막 뷰어",
+        });
+
+        navigator.mediaSession.setActionHandler("play", () => {
+            $("#audio-player").play();
+        });
+        navigator.mediaSession.setActionHandler("pause", () => {
+            $("#audio-player").pause();
+        });
+        navigator.mediaSession.setActionHandler("previoustrack", () => {
+            navigate(-1);
+        });
+        navigator.mediaSession.setActionHandler("nexttrack", () => {
+            navigate(1);
+        });
     }
 
     // --- Settings ---
