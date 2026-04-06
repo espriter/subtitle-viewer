@@ -50,6 +50,8 @@ uvicorn app.main:create_default_app --factory --host 0.0.0.0 --port 8091
 - 웹에서 폴더 생성 + SRT 업로드 (env로 on/off 가능)
 - 스와이프 제스처 + 키보드 화살표 지원
 - MP3 오디오 재생 + 자막 자동 싱크 (MP3 없으면 수동 모드)
+- 자막 싱크 보정 (±0.5초 단위 오프셋 조절)
+- 자막 자동 싱크 ON/OFF 토글 (오디오 독립 재생 가능)
 - 백그라운드 오디오 재생 + 잠금화면 미디어 컨트롤 (PWA)
 
 ## Directory Structure
