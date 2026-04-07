@@ -616,6 +616,9 @@ header h1 {
 
 #view-loop.active {
     padding-top: 0;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
 }
 
 .loop-selection-summary {
@@ -639,6 +642,7 @@ header h1 {
 .loop-body {
     display: flex;
     flex: 1;
+    min-height: 0;
     overflow: hidden;
     position: relative;
 }
