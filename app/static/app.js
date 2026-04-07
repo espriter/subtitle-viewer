@@ -669,6 +669,125 @@
         });
     }
 
+    // --- Loop Setup ---
+    function showLoopSetup() {
+        state.loop.startIndex = null;
+        state.loop.endIndex = null;
+        renderLoopList();
+        showView("loop");
+    }
+
+    function renderLoopList() {
+        const list = $("#loop-subtitle-list");
+        list.innerHTML = "";
+        const subs = state.subtitles.primary;
+        const secSubs = state.subtitles.secondary;
+
+        subs.forEach((entry, i) => {
+            const card = document.createElement("div");
+            card.className = "loop-card";
+
+            // Apply selection classes
+            const startIdx = state.loop.startIndex;
+            const endIdx = state.loop.endIndex;
+            let tagHTML = "";
+
+            if (startIdx !== null && i === startIdx) {
+                card.classList.add("loop-start");
+                tagHTML = '<span class="loop-card-tag">시작</span>';
+            } else if (endIdx !== null && i === endIdx) {
+                card.classList.add("loop-end");
+                tagHTML = '<span class="loop-card-tag">종료</span>';
+            } else if (startIdx !== null && endIdx !== null && i > startIdx && i < endIdx) {
+                card.classList.add("loop-range");
+            }
+
+            const timeStr = entry.start.split(",")[0];
+            let html = `<div class="loop-card-time">${tagHTML}#${i + 1} · ${timeStr}</div>`;
+            html += `<div class="loop-card-text">${entry.text.replace(/\n/g, " ")}</div>`;
+
+            // Secondary subtitle if available
+            if (secSubs.length > 0) {
+                const secIdx = findSubtitleAtTime(secSubs, timeToSeconds(entry.start));
+                if (secIdx >= 0) {
+                    html += `<div class="loop-card-secondary">${secSubs[secIdx].text.replace(/\n/g, " ")}</div>`;
+                }
+            }
+
+            card.innerHTML = html;
+            card.addEventListener("click", () => onLoopCardTap(i));
+            list.appendChild(card);
+        });
+
+        $("#btn-loop-save").disabled = !(state.loop.startIndex !== null && state.loop.endIndex !== null);
+    }
+
+    function onLoopCardTap(index) {
+        const startIdx = state.loop.startIndex;
+        const endIdx = state.loop.endIndex;
+
+        if (startIdx === null) {
+            // Nothing selected — set A
+            state.loop.startIndex = index;
+        } else if (startIdx === index && endIdx === null) {
+            // Same card tapped again with only A set — deselect
+            state.loop.startIndex = null;
+        } else if (endIdx === null) {
+            // A is set, no B yet
+            if (index < startIdx) {
+                // Before A — move A
+                state.loop.startIndex = index;
+            } else {
+                // After A — set B
+                state.loop.endIndex = index;
+            }
+        } else {
+            // Both A and B are set
+            if (index < startIdx) {
+                // Before A — move A
+                state.loop.startIndex = index;
+            } else if (index > endIdx) {
+                // After B — move B
+                state.loop.endIndex = index;
+            } else {
+                // Between A and B (inclusive) — reset, tapped becomes new A
+                state.loop.startIndex = index;
+                state.loop.endIndex = null;
+            }
+        }
+
+        renderLoopList();
+    }
+
+    function saveLoop() {
+        if (state.loop.startIndex === null || state.loop.endIndex === null) return;
+        state.loop.active = true;
+
+        // Return to reader
+        showView("reader");
+
+        // Show loop indicator
+        const subs = state.subtitles.primary;
+        const startTime = subs[state.loop.startIndex].start.split(",")[0];
+        const endTime = subs[state.loop.endIndex].end.split(",")[0];
+        $("#loop-indicator-text").textContent = `구간반복 ${startTime} ~ ${endTime}`;
+        $("#loop-indicator").classList.remove("hidden");
+
+        // Seek audio to start and play
+        const audio = $("#audio-player");
+        audio.currentTime = timeToSeconds(subs[state.loop.startIndex].start);
+        state.position = state.loop.startIndex;
+        renderSubtitles();
+        audio.play();
+    }
+
+    function cancelLoop() {
+        state.loop.active = false;
+        state.loop.startIndex = null;
+        state.loop.endIndex = null;
+        $("#loop-indicator").classList.add("hidden");
+    }
+
     // --- Event binding ---
     function bindEvents() {
         // Home menu cards
