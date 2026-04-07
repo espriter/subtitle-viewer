@@ -230,7 +230,7 @@
             const order = state.selectedFiles.indexOf(file);
             if (order >= 0) {
                 el.classList.add("selected");
-                const badge = order === 0 ? "1st" : "2nd";
+                const badge = order === 0 ? "▶ 1st" : "▷ 2nd";
                 el.innerHTML = `<span class="file-badge">${badge}</span> ${file}`;
             } else {
                 el.textContent = file;
