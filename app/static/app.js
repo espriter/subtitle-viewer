@@ -699,6 +699,7 @@
         state.loop.endIndex = null;
         renderLoopList();
         showView("loop");
+        setupLoopScrubber();
     }
 
     function renderLoopList() {
@@ -746,6 +747,99 @@
 
         $("#btn-loop-save").disabled = !(state.loop.startIndex !== null && state.loop.endIndex !== null);
         list.scrollTop = scrollTop;
+
+        // Update selection summary
+        updateLoopSummary();
+    }
+
+    function updateLoopSummary() {
+        const el = $("#loop-selection-summary");
+        const subs = state.subtitles.primary;
+        const startIdx = state.loop.startIndex;
+        const endIdx = state.loop.endIndex;
+
+        if (startIdx === null && endIdx === null) {
+            el.innerHTML = "시작 자막과 종료 자막을 선택하세요";
+        } else if (startIdx !== null && endIdx === null) {
+            const startTime = subs[startIdx].start.split(",")[0];
+            el.innerHTML = `<span class="summary-a">시작 #${startIdx + 1} · ${startTime}</span> → 종료를 선택하세요`;
+        } else if (startIdx !== null && endIdx !== null) {
+            const startTime = subs[startIdx].start.split(",")[0];
+            const endTime = subs[endIdx].start.split(",")[0];
+            el.innerHTML = `<span class="summary-a">시작 #${startIdx + 1} · ${startTime}</span> → <span class="summary-b">종료 #${endIdx + 1} · ${endTime}</span>`;
+        }
+    }
+
+    function setupLoopScrubber() {
+        const scrubber = $("#loop-scrubber");
+        const thumb = $("#loop-scrubber-thumb");
+        const label = $("#loop-scrubber-label");
+        const list = $("#loop-subtitle-list");
+
+        function updateThumb() {
+            if (list.scrollHeight <= list.clientHeight) {
+                thumb.style.display = "none";
+                return;
+            }
+            thumb.style.display = "";
+            const ratio = list.scrollTop / (list.scrollHeight - list.clientHeight);
+            const trackHeight = scrubber.clientHeight - thumb.clientHeight;
+            thumb.style.top = (ratio * trackHeight) + "px";
+        }
+
+        function scrollToRatio(ratio) {
+            const maxScroll = list.scrollHeight - list.clientHeight;
+            list.scrollTop = ratio * maxScroll;
+        }
+
+        function getLabel(ratio) {
+            const subs = state.subtitles.primary;
+            if (!subs || subs.length === 0) return "";
+            const idx = Math.min(Math.floor(ratio * subs.length), subs.length - 1);
+            return `#${idx + 1} · ${subs[idx].start.split(",")[0]}`;
+        }
+
+        function onDrag(clientY) {
+            const rect = scrubber.getBoundingClientRect();
+            const y = Math.max(0, Math.min(clientY - rect.top, rect.height));
+            const ratio = y / rect.height;
+            scrollToRatio(ratio);
+            // Show label
+            label.textContent = getLabel(ratio);
+            label.classList.remove("hidden");
+            label.style.top = Math.max(0, Math.min(y - 14, rect.height - 28)) + "px";
+        }
+
+        let dragging = false;
+
+        scrubber.addEventListener("pointerdown", (e) => {
+            dragging = true;
+            scrubber.classList.add("dragging");
+            scrubber.setPointerCapture(e.pointerId);
+            onDrag(e.clientY);
+        });
+
+        scrubber.addEventListener("pointermove", (e) => {
+            if (!dragging) return;
+            onDrag(e.clientY);
+        });
+
+        scrubber.addEventListener("pointerup", () => {
+            dragging = false;
+            scrubber.classList.remove("dragging");
+            label.classList.add("hidden");
+        });
+
+        scrubber.addEventListener("pointercancel", () => {
+            dragging = false;
+            scrubber.classList.remove("dragging");
+            label.classList.add("hidden");
+        });
+
+        list.addEventListener("scroll", updateThumb, { passive: true });
+
+        // Initial position
+        updateThumb();
     }
 
     function onLoopCardTap(index) {

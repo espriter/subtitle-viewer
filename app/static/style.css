@@ -516,6 +516,7 @@ header h1 {
     flex: 1;
     overflow-y: auto;
     padding-bottom: 24px;
+    padding-right: 4px;
 }
 
 .loop-card {
@@ -602,6 +603,89 @@ header h1 {
 .btn-loop-save:disabled {
     opacity: 0.4;
     cursor: default;
+}
+
+/* Loop Setup - Sticky Header */
+.loop-sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg);
+    padding-bottom: 8px;
+}
+
+#view-loop.active {
+    padding-top: 0;
+}
+
+.loop-selection-summary {
+    font-size: 13px;
+    color: var(--text-muted);
+    padding: 4px 0;
+    min-height: 22px;
+}
+
+.loop-selection-summary .summary-a {
+    color: #22c55e;
+    font-weight: 600;
+}
+
+.loop-selection-summary .summary-b {
+    color: #ef4444;
+    font-weight: 600;
+}
+
+/* Loop body: list + scrubber side by side */
+.loop-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Loop Scrubber */
+.loop-scrubber {
+    width: 28px;
+    flex-shrink: 0;
+    position: relative;
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 1px solid var(--border);
+    touch-action: none;
+    cursor: pointer;
+}
+
+.loop-scrubber-thumb {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    height: 40px;
+    background: var(--accent);
+    border-radius: 4px;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+}
+
+.loop-scrubber-thumb:active,
+.loop-scrubber.dragging .loop-scrubber-thumb {
+    opacity: 1;
+}
+
+.loop-scrubber-label {
+    position: absolute;
+    right: 36px;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-family: monospace;
+    color: var(--accent);
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.loop-scrubber-label.hidden {
+    display: none;
 }
 
 /* Responsive */

@@ -164,13 +164,23 @@
 
     <!-- View 4: Loop Setup -->
     <div id="view-loop" class="view">
-        <header>
-            <button id="btn-loop-back" class="btn-icon">&larr;</button>
-            <h1>구간반복 설정</h1>
-            <button id="btn-loop-save" class="btn btn-loop-save" disabled>저장</button>
-        </header>
-        <p class="hint">시작 자막과 종료 자막을 선택하세요</p>
-        <div id="loop-subtitle-list" class="loop-list"></div>
+        <div class="loop-sticky-header">
+            <header>
+                <button id="btn-loop-back" class="btn-icon">&larr;</button>
+                <h1>구간반복 설정</h1>
+                <button id="btn-loop-save" class="btn btn-loop-save" disabled>저장</button>
+            </header>
+            <div id="loop-selection-summary" class="loop-selection-summary">
+                시작 자막과 종료 자막을 선택하세요
+            </div>
+        </div>
+        <div class="loop-body">
+            <div id="loop-subtitle-list" class="loop-list"></div>
+            <div id="loop-scrubber" class="loop-scrubber">
+                <div id="loop-scrubber-thumb" class="loop-scrubber-thumb"></div>
+                <div id="loop-scrubber-label" class="loop-scrubber-label hidden"></div>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>
