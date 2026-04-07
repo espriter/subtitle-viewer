@@ -9,6 +9,7 @@
         selectedFiles: [],
         subtitles: { primary: [], secondary: [] },
         position: 0,
+        positionSecondary: 0,
         settings: {
             linesPerView: 1,
             navMode: "page",
@@ -277,21 +278,33 @@
                 ? await api.getSubtitles(state.currentMovie, state.selectedFiles[1])
                 : [];
         state.position = 0;
+        state.positionSecondary = 0;
         setupAudio();
         renderSubtitles();
         showView("reader");
     }
 
-    function getVisibleEntries(subs) {
+    function getVisibleEntries(subs, position) {
         const { linesPerView } = state.settings;
-        const start = state.position;
+        const start = position;
         const end = Math.min(start + linesPerView, subs.length);
         return subs.slice(start, end);
     }
 
+    function syncSecondaryPosition() {
+        const sec = state.subtitles.secondary;
+        if (!sec || sec.length === 0) return;
+        const pri = state.subtitles.primary;
+        if (!pri || pri.length === 0) return;
+        const currentTime = timeToSeconds(pri[state.position].start);
+        const idx = findSubtitleAtTime(sec, currentTime);
+        state.positionSecondary = idx >= 0 ? idx : 0;
+    }
+
     function renderSubtitles() {
-        const primary = getVisibleEntries(state.subtitles.primary);
-        const secondary = getVisibleEntries(state.subtitles.secondary);
+        syncSecondaryPosition();
+        const primary = getVisibleEntries(state.subtitles.primary, state.position);
+        const secondary = getVisibleEntries(state.subtitles.secondary, state.positionSecondary);
 
         $("#card-primary").innerHTML = primary
             .map((e) => `<div>${e.text.replace(/\n/g, "<br>")}</div>`)
