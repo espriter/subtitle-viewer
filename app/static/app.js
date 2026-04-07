@@ -227,26 +227,28 @@
         state.files.forEach((file) => {
             const el = document.createElement("div");
             el.className = "card-item";
-            el.textContent = file;
-            el.addEventListener("click", () => toggleFileSelection(file, el));
-            if (state.selectedFiles.includes(file)) {
+            const order = state.selectedFiles.indexOf(file);
+            if (order >= 0) {
                 el.classList.add("selected");
+                const badge = order === 0 ? "1st" : "2nd";
+                el.innerHTML = `<span class="file-badge">${badge}</span> ${file}`;
+            } else {
+                el.textContent = file;
             }
+            el.addEventListener("click", () => toggleFileSelection(file));
             list.appendChild(el);
         });
         updateStartButton();
     }
 
-    function toggleFileSelection(file, el) {
+    function toggleFileSelection(file) {
         const idx = state.selectedFiles.indexOf(file);
         if (idx >= 0) {
             state.selectedFiles.splice(idx, 1);
-            el.classList.remove("selected");
         } else if (state.selectedFiles.length < 2) {
             state.selectedFiles.push(file);
-            el.classList.add("selected");
         }
-        updateStartButton();
+        renderFileList();
     }
 
     function updateStartButton() {
