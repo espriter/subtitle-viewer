@@ -53,6 +53,10 @@ uvicorn app.main:create_default_app --factory --host 0.0.0.0 --port 8091
 - 자막 싱크 보정 (±0.5초 단위 오프셋 조절)
 - 자막 자동 싱크 ON/OFF 토글 (오디오 독립 재생 가능)
 - 백그라운드 오디오 재생 + 잠금화면 미디어 컨트롤 (PWA)
+- 화면 꺼짐 방지 (Wake Lock API + NoSleep 비디오 fallback)
+- 듀얼 자막 시간 기준 독립 싱크 (secondary는 primary 타임스탬프 기준 매칭)
+- 자막 선택 순서 표시 (▶ 1st / ▷ 2nd 뱃지)
+- 자막 테마 파비콘 및 앱 아이콘
 
 ## Directory Structure
 
@@ -63,6 +67,8 @@ uvicorn app.main:create_default_app --factory --host 0.0.0.0 --port 8091
 │   ├── srt_parser.py         # SRT parsing logic
 │   ├── upload_router.py      # Upload endpoints (modular, toggleable)
 │   └── static/               # Frontend SPA
+│       ├── favicon.ico
+│       └── icons/            # PWA icons (192, 512)
 ├── tests/                    # 125 tests
 ├── subtitles/                # Runtime data (gitignored)
 │   └── {movie-name}/
