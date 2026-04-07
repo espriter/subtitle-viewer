@@ -20,6 +20,11 @@
         uploadEnabled: true,
         audioFile: null,
         wakeLock: null,
+        loop: {
+            startIndex: null,
+            endIndex: null,
+            active: false,
+        },
     };
 
     // --- API ---
@@ -65,6 +70,7 @@
         movies: $("#view-movies"),
         files: $("#view-files"),
         reader: $("#view-reader"),
+        loop: $("#view-loop"),
     };
 
     // --- View switching ---
