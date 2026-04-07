@@ -18,6 +18,7 @@
         },
         uploadEnabled: true,
         audioFile: null,
+        wakeLock: null,
     };
 
     // --- API ---
@@ -69,6 +70,11 @@
     function showView(name) {
         Object.values(views).forEach((v) => v.classList.remove("active"));
         views[name].classList.add("active");
+        if (name === "reader") {
+            requestWakeLock();
+        } else {
+            releaseWakeLock();
+        }
     }
 
     // --- Home Screen ---
@@ -509,6 +515,113 @@
         fileInput.value = "";
     }
 
+    // --- Wake Lock (screen stay-on) ---
+    // Primary: Screen Wake Lock API
+    // Fallback: hidden silent video loop (NoSleep pattern for iOS/Android)
+    let wakeLockVideo = null;
+    let wakeLockTimer = null;
+
+    function createWakeLockVideo() {
+        if (wakeLockVideo) return wakeLockVideo;
+        // Tiny silent MP4 video (base64) — prevents screen sleep on iOS/Android
+        const SILENT_MP4 = "data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAA" +
+            "ABtZGF0AAACrgYF//+q3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE0OCByMjY0MyA1YzY1NzA0IC0gSC4yNjQvTV" +
+            "BFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAxNSAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQuaHR" +
+            "tbCAtIG9wdGlvbnM6IGNhYmFjPTEgcmVmPTMgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MzoweDExMyBtZT1oZXggc3Vi" +
+            "bWU9NyBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0xIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsa" +
+            "XM9MSA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0tMiB0aH" +
+            "JlYWRzPTEgbG9va2FoZWFkX3RocmVhZHM9MSBzbGljZWRfdGhyZWFkcz0wIG5yPTAgZGVjaW1hdGU9MSBpbnRlcmxhY2V" +
+            "kPTAgYmx1cmF5X2NvbXBhdD0wIGNvbnN0cmFpbmVkX2ludHJhPTAgYmZyYW1lcz0zIGJfcHlyYW1pZD0yIGJfYWRhcHQ9" +
+            "MSBiX2JpYXM9MCBkaXJlY3Q9MSB3ZWlnaHRiPTEgb3Blbl9nb3A9MCB3ZWlnaHRwPTIga2V5aW50PTI1MCBrZXlpbnRfb" +
+            "WluPTI1IHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj" +
+            "0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMAAAAAAP" +
+            "pGVuY28gbGF2YzU2LjYwLjEwMAAAAAAYc3R0cwAAAAAAAAABAAAAAgAABAAAAAAUc3RzcwAAAAAAAAABAAAAAQAAABxzdHNjA" +
+            "AAAAAAAAAEAAAABAAAAAgAAAAEAAAAcc3RzegAAAAAAAAAAAAAAAgAAArIAAAAGAAAAFHN0Y28AAAAAAAAAAQAAADAAAABidWR0" +
+            "YQAAAFptZXRhAAAAIWhkbHIAAAAAAAAAAG1kaXJhcHBsAAAAAAAAAAAAAAAALWlsc3QAAAAlqXRvbwAAAB1kYXRhAAAAAQAAA" +
+            "ABMYXZmNTYuNDAuMTAx";
+        const video = document.createElement("video");
+        video.setAttribute("playsinline", "");
+        video.setAttribute("webkit-playsinline", "");
+        video.setAttribute("muted", "");
+        video.muted = true;
+        video.loop = true;
+        video.src = SILENT_MP4;
+        video.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;";
+        document.body.appendChild(video);
+        wakeLockVideo = video;
+        return video;
+    }
+
+    function startVideoWakeLock() {
+        const video = createWakeLockVideo();
+        const playPromise = video.play();
+        if (playPromise) playPromise.catch(() => {});
+    }
+
+    function stopVideoWakeLock() {
+        if (wakeLockVideo && !wakeLockVideo.paused) {
+            wakeLockVideo.pause();
+        }
+    }
+
+    async function requestWakeLock() {
+        // Try native Wake Lock API first
+        let nativeAcquired = false;
+        if ("wakeLock" in navigator) {
+            try {
+                state.wakeLock = await navigator.wakeLock.request("screen");
+                nativeAcquired = true;
+                state.wakeLock.addEventListener("release", () => {
+                    state.wakeLock = null;
+                    // If still in reader, fallback to video and schedule re-acquire
+                    if (views.reader.classList.contains("active")) {
+                        startVideoWakeLock();
+                    }
+                });
+            } catch {
+                // Wake lock request failed
+            }
+        }
+
+        // Always also start video fallback for maximum reliability
+        startVideoWakeLock();
+
+        // Periodic re-acquisition: re-request native wake lock every 60s
+        clearInterval(wakeLockTimer);
+        wakeLockTimer = setInterval(() => {
+            if (!views.reader.classList.contains("active")) {
+                clearInterval(wakeLockTimer);
+                return;
+            }
+            if (!state.wakeLock && "wakeLock" in navigator) {
+                navigator.wakeLock.request("screen").then((lock) => {
+                    state.wakeLock = lock;
+                    lock.addEventListener("release", () => {
+                        state.wakeLock = null;
+                        if (views.reader.classList.contains("active")) {
+                            startVideoWakeLock();
+                        }
+                    });
+                }).catch(() => {});
+            }
+            // Keep video alive too
+            if (wakeLockVideo && wakeLockVideo.paused) {
+                const p = wakeLockVideo.play();
+                if (p) p.catch(() => {});
+            }
+        }, 60000);
+    }
+
+    async function releaseWakeLock() {
+        clearInterval(wakeLockTimer);
+        wakeLockTimer = null;
+        if (state.wakeLock) {
+            await state.wakeLock.release();
+            state.wakeLock = null;
+        }
+        stopVideoWakeLock();
+    }
+
     // --- Swipe gestures ---
     function setupSwipe() {
         let startX = 0;
@@ -662,6 +775,13 @@
         showHomeScreen();
         updateResumeCard();
         await loadMovies();
+
+        // Re-acquire wake lock when returning to the app
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible" && views.reader.classList.contains("active")) {
+                requestWakeLock();
+            }
+        });
     }
 
     document.addEventListener("DOMContentLoaded", init);
