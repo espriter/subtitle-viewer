@@ -217,6 +217,7 @@
     async function selectMovie(movie) {
         state.currentMovie = movie;
         state.selectedFiles = [];
+        cancelLoop();
         $("#movie-title").textContent = movie;
         state.files = await api.getFiles(movie);
         state.audioFile = state.files.find(f => f.endsWith('.mp3')) || null;
@@ -277,6 +278,7 @@
 
     // --- View 3: Reader ---
     async function startReader() {
+        cancelLoop();
         state.subtitles.primary = await api.getSubtitles(
             state.currentMovie,
             state.selectedFiles[0]
@@ -408,6 +410,8 @@
             container.classList.add("hidden");
             audio.removeAttribute("src");
             audio.load();
+            const btnLoop = $("#btn-loop");
+            if (btnLoop) btnLoop.classList.add("hidden");
             return;
         }
 
@@ -427,12 +431,32 @@
 
         audio.removeEventListener("error", onAudioError);
         audio.addEventListener("error", onAudioError);
+
+        const btnLoop = $("#btn-loop");
+        if (btnLoop) btnLoop.classList.remove("hidden");
     }
 
     function onTimeUpdate() {
         if (!state.settings.autoSync) return;
         const audio = $("#audio-player");
         const t = audio.currentTime + state.settings.syncOffset;
+
+        // Loop enforcement: seek back to A when passing B's end time
+        if (state.loop.active) {
+            const subs = state.subtitles.primary;
+            const endEntry = subs[state.loop.endIndex];
+            if (endEntry) {
+                const endSec = timeToSeconds(endEntry.end);
+                if (t >= endSec) {
+                    const startSec = timeToSeconds(subs[state.loop.startIndex].start);
+                    audio.currentTime = startSec;
+                    state.position = state.loop.startIndex;
+                    renderSubtitles();
+                    return;
+                }
+            }
+        }
+
         const subs = state.subtitles.primary;
         const idx = findSubtitleAtTime(subs, t);
         if (idx >= 0 && idx !== state.position) {
@@ -900,6 +924,12 @@
         if (btnCreate) {
             btnCreate.addEventListener("click", createMovie);
         }
+
+        // Loop
+        $("#btn-loop").addEventListener("click", showLoopSetup);
+        $("#btn-loop-back").addEventListener("click", () => showView("reader"));
+        $("#btn-loop-save").addEventListener("click", saveLoop);
+        $("#btn-loop-cancel").addEventListener("click", cancelLoop);
 
         setupSwipe();
         setupKeyboard();
