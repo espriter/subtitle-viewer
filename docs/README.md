@@ -57,6 +57,9 @@ uvicorn app.main:create_default_app --factory --host 0.0.0.0 --port 8091
 - 듀얼 자막 시간 기준 독립 싱크 (secondary는 primary 타임스탬프 기준 매칭)
 - 자막 선택 순서 표시 (▶ 1st / ▷ 2nd 뱃지)
 - 자막 테마 파비콘 및 앱 아이콘
+- 구간반복 재생 (A-B 루프) — 어학 학습용 구간 선택 후 반복 청취
+  - 전용 설정 화면에서 시작/종료 자막 선택 (초록/빨강 마커)
+  - Sticky 헤더 + 선택 요약, 우측 드래그 스크러버로 빠른 탐색
 
 ## Directory Structure
 
@@ -152,3 +155,5 @@ uvicorn app.main:create_default_app --factory --host 0.0.0.0 --port 8091
 - [설계서](superpowers/specs/2026-04-03-subtitle-viewer-design.md)
 - [구현 플랜](superpowers/plans/2026-04-03-subtitle-viewer.md)
 - [오디오 싱크 설계](superpowers/specs/2026-04-03-audio-sync-design.md)
+- [구간반복 설계](superpowers/specs/2026-04-07-loop-playback-design.md)
+- [구간반복 구현 플랜](superpowers/plans/2026-04-07-loop-playback.md)
