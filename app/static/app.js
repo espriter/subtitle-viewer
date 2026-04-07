@@ -253,7 +253,6 @@
 
     function updateStartButton() {
         $("#btn-start").disabled = state.selectedFiles.length === 0;
-        $("#dual-sub-notice").classList.toggle("hidden", state.selectedFiles.length < 2);
     }
 
     function updateUploadVisibility() {
