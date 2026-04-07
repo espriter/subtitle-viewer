@@ -703,6 +703,7 @@
 
     function renderLoopList() {
         const list = $("#loop-subtitle-list");
+        const scrollTop = list.scrollTop;
         list.innerHTML = "";
         const subs = state.subtitles.primary;
         const secSubs = state.subtitles.secondary;
@@ -744,6 +745,7 @@
         });
 
         $("#btn-loop-save").disabled = !(state.loop.startIndex !== null && state.loop.endIndex !== null);
+        list.scrollTop = scrollTop;
     }
 
     function onLoopCardTap(index) {
@@ -802,7 +804,7 @@
         audio.currentTime = timeToSeconds(subs[state.loop.startIndex].start);
         state.position = state.loop.startIndex;
         renderSubtitles();
-        audio.play();
+        audio.play().catch(() => {});
     }
 
     function cancelLoop() {
