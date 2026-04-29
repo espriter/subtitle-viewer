@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.srt_parser import parse_srt
+from app.smi_parser import parse_smi
 
 _SAFE_NAME = re.compile(r"^[a-zA-Z0-9_\-]+(\.[a-zA-Z0-9_\-]+)*$")
 
@@ -55,7 +56,7 @@ def create_app(
             raise HTTPException(status_code=404, detail="Movie not found")
         return sorted(
             f.name for f in movie_dir.iterdir()
-            if f.is_file() and f.suffix in (".srt", ".mp3")
+            if f.is_file() and f.suffix in (".srt", ".smi", ".mp3")
         )
 
     @app.get("/api/movies/{movie}/subtitles/{filename}")
@@ -69,10 +70,15 @@ def create_app(
             raise HTTPException(status_code=404, detail="Subtitle file not found")
         if not is_file:
             raise HTTPException(status_code=404, detail="Subtitle file not found")
-        try:
-            content = filepath.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            content = filepath.read_text(encoding="latin-1")
+        raw = filepath.read_bytes()
+        for enc in ("utf-8", "euc-kr", "latin-1"):
+            try:
+                content = raw.decode(enc)
+                break
+            except (UnicodeDecodeError, ValueError):
+                continue
+        if filepath.suffix == ".smi":
+            return parse_smi(content)
         return parse_srt(content)
 
     @app.get("/api/movies/{movie}/audio/{filename}")

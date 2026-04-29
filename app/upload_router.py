@@ -44,8 +44,8 @@ def create_upload_router(subtitles_dir: Path) -> APIRouter:
         if not movie_dir.is_dir():
             raise HTTPException(status_code=404, detail="Movie not found")
 
-        if not file.filename or not file.filename.endswith(".srt"):
-            raise HTTPException(status_code=400, detail="Only .srt files allowed")
+        if not file.filename or not file.filename.endswith((".srt", ".smi")):
+            raise HTTPException(status_code=400, detail="Only .srt and .smi files allowed")
 
         if not _SAFE_NAME.match(file.filename):
             raise HTTPException(status_code=400, detail=f"Invalid filename: {file.filename}")
