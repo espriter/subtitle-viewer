@@ -113,7 +113,7 @@ if ENABLE_UPLOAD:
 - Upload button: add SRT to this movie (when upload enabled)
 - "Start" button to enter viewer
 
-**View 3 — Subtitle Viewer (main)**
+**View 3 — [Subtitle Viewer](../../README.md) (main)**
 - Dark theme, mobile-first
 - Card block layout: each language in a separate card with distinct background
 - Dual subtitle: top card (subtitle 1) + bottom card (subtitle 2)
