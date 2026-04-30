@@ -221,7 +221,7 @@
         $("#movie-title").textContent = movie;
         state.files = await api.getFiles(movie);
         state.audioFile = state.files.find(f => f.endsWith('.mp3')) || null;
-        state.files = state.files.filter(f => f.endsWith('.srt'));
+        state.files = state.files.filter(f => f.endsWith('.srt') || f.endsWith('.smi'));
         renderFileList();
         updateUploadVisibility();
         updateAudioHint();
