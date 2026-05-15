@@ -60,6 +60,9 @@ uvicorn app.main:create_default_app --factory --host 0.0.0.0 --port 8091
 - 구간반복 재생 (A-B 루프) — 어학 학습용 구간 선택 후 반복 청취
   - 전용 설정 화면에서 시작/종료 자막 선택 (초록/빨강 마커)
   - Sticky 헤더 + 선택 요약, 우측 드래그 스크러버로 빠른 탐색
+- 챕터 기반 학습 시작
+  - MP3 embedded chapter 또는 `chapters.json` sidecar를 읽어 파일 선택 화면에 표시
+  - 챕터 선택 후 시작하면 해당 시간대와 가장 가까운 자막으로 이동
 
 ## Directory Structure
 
@@ -92,13 +95,33 @@ subtitles/
 └── {movie-name}/       # 영화별 폴더 (영문, 숫자, 하이픈, 언더스코어)
     ├── en.srt          # 영어 자막
     ├── ko.srt          # 한국어 자막
-    └── audio.mp3       # 오디오 파일 (선택, 서버에서 직접 배치)
+    ├── audio.mp3       # 오디오 파일 (선택, 서버에서 직접 배치)
+    └── chapters.json   # 챕터 메타데이터 (선택)
 ```
 
 > **파일명 제약:** 폴더명과 파일명 모두 **영문, 숫자, 하이픈(`-`), 언더스코어(`_`), 마침표(`.`)** 만 허용됩니다.
 > 대괄호(`[]`), 공백, 한글 등 특수문자가 포함되면 API에서 400 에러가 발생합니다.
 
 웹 UI에서 폴더 생성 및 SRT 업로드 가능. 또는 서버에서 직접 파일 배치.
+
+### chapters.json
+
+MP3에 embedded chapter가 없으면 폴더에 `chapters.json`을 둘 수 있습니다.
+
+```json
+[
+  {"title": "Spark shuffle basics", "start": 0, "end": 420},
+  {"title": "Structured Streaming checkpoints", "start": 420, "end": 900}
+]
+```
+
+`start`와 `end`는 초 단위입니다. API는 이 파일을 `/api/movies/{movie}/chapters`에서 정규화된 챕터 목록으로 제공합니다.
+
+## Data Engineer Study Mode
+
+외국계 Data Engineer 이직 준비를 위한 학습 모드로 개편 중입니다. 현재 1차 범위는 챕터 기반 시작 위치 선택입니다.
+
+다음 단계에서는 자막 라인별 북마크/메모, `Spark`/`Kafka`/`Snowflake`/`Databricks`/`Governance` 같은 주제 태그, LifeOS FCS나 recruitment 프로필에 붙일 수 있는 Markdown/JSON export를 추가하는 방향입니다.
 
 ## Environment Variables
 
@@ -146,7 +169,7 @@ sudo bash /srv/scripts/deploy-subtitle-viewer.sh
 cd /srv/subtitle-viewer
 source venv/bin/activate
 pip install -r requirements.txt
-python -m pytest tests/ -v           # 125 tests
+python -m pytest tests/ -v           # 129 tests
 uvicorn app.main:create_default_app --factory --host 0.0.0.0 --port 8091
 ```
 
@@ -157,3 +180,5 @@ uvicorn app.main:create_default_app --factory --host 0.0.0.0 --port 8091
 - [오디오 싱크 설계](superpowers/specs/2026-04-03-audio-sync-design.md)
 - [구간반복 설계](superpowers/specs/2026-04-07-loop-playback-design.md)
 - [구간반복 구현 플랜](superpowers/plans/2026-04-07-loop-playback.md)
+- [Data Engineer Study Mode 설계](plans/2026-05-15-data-engineer-study-mode-design.md)
+- [Data Engineer Study Mode 구현 플랜](plans/2026-05-15-data-engineer-study-mode.md)

@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.chapter_metadata import load_chapters
 from app.srt_parser import parse_srt
 from app.smi_parser import parse_smi
 
@@ -80,6 +81,21 @@ def create_app(
         if filepath.suffix == ".smi":
             return parse_smi(content)
         return parse_srt(content)
+
+    @app.get("/api/movies/{movie}/chapters")
+    def get_chapters(movie: str):
+        _validate_name(movie)
+        movie_dir = subs_dir / movie
+        try:
+            is_dir = movie_dir.is_dir()
+        except OSError:
+            raise HTTPException(status_code=404, detail="Movie not found")
+        if not is_dir:
+            raise HTTPException(status_code=404, detail="Movie not found")
+        try:
+            return load_chapters(movie_dir)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.get("/api/movies/{movie}/audio/{filename}")
     def get_audio(movie: str, filename: str):

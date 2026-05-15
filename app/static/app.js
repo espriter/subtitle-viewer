@@ -7,6 +7,8 @@
         currentMovie: null,
         files: [],
         selectedFiles: [],
+        chapters: [],
+        selectedChapterIndex: null,
         subtitles: { primary: [], secondary: [] },
         position: 0,
         positionSecondary: 0,
@@ -35,6 +37,10 @@
         },
         async getFiles(movie) {
             const resp = await fetch(`api/movies/${encodeURIComponent(movie)}/files`);
+            return resp.json();
+        },
+        async getChapters(movie) {
+            const resp = await fetch(`api/movies/${encodeURIComponent(movie)}/chapters`);
             return resp.json();
         },
         async getSubtitles(movie, file) {
@@ -217,11 +223,14 @@
     async function selectMovie(movie) {
         state.currentMovie = movie;
         state.selectedFiles = [];
+        state.selectedChapterIndex = null;
         cancelLoop();
         $("#movie-title").textContent = movie;
         state.files = await api.getFiles(movie);
+        state.chapters = await api.getChapters(movie);
         state.audioFile = state.files.find(f => f.endsWith('.mp3')) || null;
         state.files = state.files.filter(f => f.endsWith('.srt') || f.endsWith('.smi'));
+        renderChapterList();
         renderFileList();
         updateUploadVisibility();
         updateAudioHint();
@@ -246,6 +255,46 @@
             list.appendChild(el);
         });
         updateStartButton();
+    }
+
+    function renderChapterList() {
+        const section = $("#chapter-section");
+        const list = $("#chapter-list");
+        if (!section || !list) return;
+
+        list.innerHTML = "";
+        if (!state.chapters || state.chapters.length === 0) {
+            section.classList.add("hidden");
+            return;
+        }
+
+        section.classList.remove("hidden");
+        state.chapters.forEach((chapter, index) => {
+            const el = document.createElement("button");
+            el.type = "button";
+            el.className = "chapter-card";
+            if (state.selectedChapterIndex === index) {
+                el.classList.add("selected");
+            }
+
+            const time = document.createElement("span");
+            time.className = "chapter-time";
+            time.textContent = `${chapter.start.split(".")[0]} · #${chapter.index}`;
+
+            const title = document.createElement("span");
+            title.className = "chapter-title";
+            title.textContent = chapter.title;
+
+            el.appendChild(time);
+            el.appendChild(title);
+            el.addEventListener("click", () => toggleChapterSelection(index));
+            list.appendChild(el);
+        });
+    }
+
+    function toggleChapterSelection(index) {
+        state.selectedChapterIndex = state.selectedChapterIndex === index ? null : index;
+        renderChapterList();
     }
 
     function toggleFileSelection(file) {
@@ -289,7 +338,17 @@
                 : [];
         state.position = 0;
         state.positionSecondary = 0;
+        const selectedChapter = state.chapters[state.selectedChapterIndex];
+        if (selectedChapter && state.subtitles.primary.length > 0) {
+            state.position = findNearestSubtitle(
+                state.subtitles.primary,
+                selectedChapter.start_seconds
+            );
+        }
         setupAudio();
+        if (selectedChapter && state.audioFile) {
+            $("#audio-player").currentTime = selectedChapter.start_seconds;
+        }
         renderSubtitles();
         showView("reader");
     }

@@ -466,6 +466,66 @@ header h1 {
     display: none;
 }
 
+/* Chapters */
+.chapter-section {
+    margin-bottom: 12px;
+}
+
+.chapter-section.hidden {
+    display: none;
+}
+
+.section-label {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.chapter-list {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+}
+
+.chapter-card {
+    min-width: 164px;
+    max-width: 220px;
+    min-height: 72px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    text-align: left;
+}
+
+.chapter-card.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+.chapter-time {
+    color: var(--text-secondary);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+}
+
+.chapter-title {
+    display: -webkit-box;
+    font-size: 13px;
+    line-height: 1.25;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
 /* Audio Player */
 #audio-container {
     padding: 8px 16px;
