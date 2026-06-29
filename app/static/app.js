@@ -18,6 +18,8 @@
             fontSize: 24,
             syncOffset: 0,
             autoSync: true,
+            loopCount: 0,   // 0 = 무한 반복, N = N회 후 정지
+            loopGap: 0,     // 구간 끝(B)에서 멈췄다 되감기까지 초
         },
         uploadEnabled: true,
         audioFile: null,
@@ -26,6 +28,10 @@
             startIndex: null,
             endIndex: null,
             active: false,
+            _done: 0,        // 현재까지 반복한 횟수
+            _finished: false, // loopCount 도달로 종료됨
+            _waiting: false,  // 끝 멈춤(gap) 대기 중
+            _gapTimer: null,
         },
     };
 
@@ -496,32 +502,90 @@
     }
 
     function onTimeUpdate() {
-        if (!state.settings.autoSync) return;
         const audio = $("#audio-player");
+        const subs = state.subtitles.primary;
         const t = audio.currentTime + state.settings.syncOffset;
 
-        // Loop enforcement: seek back to A when passing B's end time
-        if (state.loop.active) {
-            const subs = state.subtitles.primary;
-            const endEntry = subs[state.loop.endIndex];
-            if (endEntry) {
-                const endSec = timeToSeconds(endEntry.end);
-                if (t >= endSec) {
-                    const startSec = timeToSeconds(subs[state.loop.startIndex].start);
-                    audio.currentTime = startSec;
-                    state.position = state.loop.startIndex;
-                    renderSubtitles();
-                    return;
-                }
+        // Loop enforcement runs regardless of autoSync (#1):
+        // seek back to A when playback passes B's end time.
+        const loop = state.loop;
+        if (loop.active && !loop._finished && !loop._waiting &&
+            loop.startIndex !== null && loop.endIndex !== null) {
+            const endEntry = subs[loop.endIndex];
+            if (endEntry && t >= timeToSeconds(endEntry.end)) {
+                handleLoopBoundary();
+                return;
             }
         }
 
-        const subs = state.subtitles.primary;
+        if (!state.settings.autoSync) return;
+
         const idx = findSubtitleAtTime(subs, t);
         if (idx >= 0 && idx !== state.position) {
             state.position = idx;
             renderSubtitles();
         }
+    }
+
+    // Convert a subtitle's display time to the raw audio.currentTime it maps to,
+    // compensating for syncOffset so seeks land where the user expects (#4).
+    function audioTimeForSubtitleStart(index) {
+        const startSec = timeToSeconds(state.subtitles.primary[index].start);
+        return Math.max(0, startSec - state.settings.syncOffset);
+    }
+
+    function seekToLoopStart() {
+        const audio = $("#audio-player");
+        audio.currentTime = audioTimeForSubtitleStart(state.loop.startIndex);
+        state.position = state.loop.startIndex;
+        renderSubtitles();
+        audio.play().catch(() => {});
+    }
+
+    function handleLoopBoundary() {
+        const audio = $("#audio-player");
+
+        // Count handling: stop after loopCount repeats.
+        if (state.settings.loopCount > 0) {
+            state.loop._done += 1;
+            if (state.loop._done >= state.settings.loopCount) {
+                audio.pause();
+                state.loop._finished = true;
+                updateLoopIndicator();
+                return;
+            }
+        }
+
+        if (state.settings.loopGap > 0) {
+            // Pause briefly at B before rewinding (shadowing practice).
+            state.loop._waiting = true;
+            audio.pause();
+            updateLoopIndicator();
+            state.loop._gapTimer = window.setTimeout(() => {
+                state.loop._waiting = false;
+                state.loop._gapTimer = null;
+                if (state.loop.active) {
+                    seekToLoopStart();
+                    updateLoopIndicator();
+                }
+            }, state.settings.loopGap * 1000);
+        } else {
+            seekToLoopStart();
+            updateLoopIndicator();
+        }
+    }
+
+    function replayLoop() {
+        if (!state.loop.active || state.loop.startIndex === null) return;
+        if (state.loop._gapTimer) {
+            window.clearTimeout(state.loop._gapTimer);
+            state.loop._gapTimer = null;
+        }
+        state.loop._done = 0;
+        state.loop._finished = false;
+        state.loop._waiting = false;
+        seekToLoopStart();
+        updateLoopIndicator();
     }
 
     function onAudioError() {
@@ -753,12 +817,31 @@
     }
 
     // --- Loop Setup ---
-    function showLoopSetup() {
-        state.loop.startIndex = null;
-        state.loop.endIndex = null;
+    // preserve=true keeps current A/B (used when editing an active loop).
+    function showLoopSetup(preserve) {
+        if (!preserve) {
+            state.loop.startIndex = null;
+            state.loop.endIndex = null;
+        }
+        renderLoopOptions();
         renderLoopList();
         showView("loop");
         setupLoopScrubber();
+
+        if (preserve && state.loop.startIndex !== null) {
+            const list = $("#loop-subtitle-list");
+            const card = list.children[state.loop.startIndex];
+            if (card) card.scrollIntoView({ block: "center" });
+        }
+    }
+
+    function renderLoopOptions() {
+        $$("[data-count]").forEach((b) => {
+            b.classList.toggle("active", parseInt(b.dataset.count) === state.settings.loopCount);
+        });
+        $$("[data-gap]").forEach((b) => {
+            b.classList.toggle("active", parseInt(b.dataset.gap) === state.settings.loopGap);
+        });
     }
 
     function renderLoopList() {
@@ -829,11 +912,27 @@
         }
     }
 
+    let loopScrubberBound = false;
     function setupLoopScrubber() {
         const scrubber = $("#loop-scrubber");
         const thumb = $("#loop-scrubber-thumb");
         const label = $("#loop-scrubber-label");
         const list = $("#loop-subtitle-list");
+
+        // Listeners must be bound only once; re-entry would stack duplicates.
+        if (loopScrubberBound) {
+            requestAnimationFrame(() => {
+                if (list.scrollHeight <= list.clientHeight) {
+                    thumb.style.display = "none";
+                } else {
+                    thumb.style.display = "";
+                    const ratio = list.scrollTop / (list.scrollHeight - list.clientHeight);
+                    thumb.style.top = (ratio * (scrubber.clientHeight - thumb.clientHeight)) + "px";
+                }
+            });
+            return;
+        }
+        loopScrubberBound = true;
 
         function updateThumb() {
             if (list.scrollHeight <= list.clientHeight) {
@@ -941,29 +1040,51 @@
     function saveLoop() {
         if (state.loop.startIndex === null || state.loop.endIndex === null) return;
         state.loop.active = true;
+        state.loop._done = 0;
+        state.loop._finished = false;
+        state.loop._waiting = false;
 
-        // Return to reader
+        // Return to reader, show indicator, seek to A and play.
         showView("reader");
-
-        // Show loop indicator
-        const subs = state.subtitles.primary;
-        const startTime = subs[state.loop.startIndex].start.split(",")[0];
-        const endTime = subs[state.loop.endIndex].end.split(",")[0];
-        $("#loop-indicator-text").textContent = `구간반복 ${startTime} ~ ${endTime}`;
         $("#loop-indicator").classList.remove("hidden");
+        updateLoopIndicator();
+        seekToLoopStart();
+    }
 
-        // Seek audio to start and play
-        const audio = $("#audio-player");
-        audio.currentTime = timeToSeconds(subs[state.loop.startIndex].start);
-        state.position = state.loop.startIndex;
-        renderSubtitles();
-        audio.play().catch(() => {});
+    function updateLoopIndicator() {
+        const loop = state.loop;
+        if (loop.startIndex === null || loop.endIndex === null) return;
+        const subs = state.subtitles.primary;
+        const startTime = subs[loop.startIndex].start.split(",")[0];
+        const endTime = subs[loop.endIndex].end.split(",")[0];
+        const count = state.settings.loopCount;
+
+        let label = `${startTime} ~ ${endTime}`;
+        if (loop._finished) {
+            label = `✓ ${count}회 완료 · ${label}`;
+        } else if (loop._waiting) {
+            label = `⏸ ${label}`;
+        } else if (count > 0) {
+            label += `  ${loop._done}/${count}회`;
+        }
+        $("#loop-indicator-text").textContent = label;
+
+        // Replay button is only meaningful once a loop is running.
+        const replayBtn = $("#btn-loop-replay");
+        if (replayBtn) replayBtn.classList.toggle("hidden", !loop.active);
     }
 
     function cancelLoop() {
+        if (state.loop._gapTimer) {
+            window.clearTimeout(state.loop._gapTimer);
+            state.loop._gapTimer = null;
+        }
         state.loop.active = false;
         state.loop.startIndex = null;
         state.loop.endIndex = null;
+        state.loop._done = 0;
+        state.loop._finished = false;
+        state.loop._waiting = false;
         $("#loop-indicator").classList.add("hidden");
     }
 
@@ -1081,10 +1202,28 @@
         }
 
         // Loop
-        $("#btn-loop").addEventListener("click", showLoopSetup);
+        $("#btn-loop").addEventListener("click", () => showLoopSetup(false));
         $("#btn-loop-back").addEventListener("click", () => showView("reader"));
         $("#btn-loop-save").addEventListener("click", saveLoop);
         $("#btn-loop-cancel").addEventListener("click", cancelLoop);
+        $("#btn-loop-replay").addEventListener("click", replayLoop);
+        $("#loop-indicator-main").addEventListener("click", () => showLoopSetup(true));
+
+        // Loop options (repeat count / end gap)
+        $$("[data-count]").forEach((b) => {
+            b.addEventListener("click", () => {
+                state.settings.loopCount = parseInt(b.dataset.count);
+                saveSettings();
+                renderLoopOptions();
+            });
+        });
+        $$("[data-gap]").forEach((b) => {
+            b.addEventListener("click", () => {
+                state.settings.loopGap = parseInt(b.dataset.gap);
+                saveSettings();
+                renderLoopOptions();
+            });
+        });
 
         setupSwipe();
         setupKeyboard();

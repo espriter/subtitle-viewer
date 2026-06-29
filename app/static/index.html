@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#1a1a2e">
+    <meta name="theme-color" content="#0b0d10">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
@@ -24,11 +24,12 @@
     <div id="view-movies" class="view active">
         <div id="home-screen">
             <div class="home-hero">
+                <div class="home-kicker">SUBTITLE READER</div>
                 <h1 class="home-title">자막 뷰어</h1>
-                <p class="home-subtitle">영상 자막을 크게 읽고, 두 언어를 비교하세요</p>
+                <p class="home-subtitle">크게 읽고, 두 언어를 비교하고, 구간을 반복하세요</p>
             </div>
             <div class="home-menu">
-                <div class="menu-card" id="menu-movie-list">
+                <div class="menu-card feature" id="menu-movie-list">
                     <span class="menu-icon">📂</span>
                     <div class="menu-text">
                         <div class="menu-title">영화 목록</div>
@@ -37,18 +38,18 @@
                     <span class="menu-arrow">›</span>
                 </div>
                 <div class="menu-card" id="menu-resume">
-                    <span class="menu-icon">⏱️</span>
+                    <span class="menu-icon">▶</span>
                     <div class="menu-text">
-                        <div class="menu-title">최근 이어보기</div>
+                        <div class="menu-title">이어보기</div>
                         <div class="menu-desc" id="resume-desc">마지막 위치부터 계속</div>
                     </div>
                     <span class="menu-arrow">›</span>
                 </div>
                 <div class="menu-card" id="menu-create-folder" style="display:none">
-                    <span class="menu-icon">➕</span>
+                    <span class="menu-icon">＋</span>
                     <div class="menu-text">
                         <div class="menu-title">새 폴더 만들기</div>
-                        <div class="menu-desc">SRT 자막 업로드</div>
+                        <div class="menu-desc">SRT · SMI 업로드</div>
                     </div>
                     <span class="menu-arrow">›</span>
                 </div>
@@ -74,12 +75,12 @@
             <button id="btn-back-movies" class="btn-icon">&larr;</button>
             <h1 id="movie-title"></h1>
         </header>
-        <p class="hint">자막 파일을 1~2개 선택하세요</p>
-        <p id="audio-hint" class="audio-hint hidden">🔊 오디오 파일이 포함되어 있습니다</p>
+        <p id="audio-hint" class="audio-hint hidden">🔊 오디오 포함</p>
         <section id="chapter-section" class="chapter-section hidden">
             <div class="section-label">챕터</div>
             <div id="chapter-list" class="chapter-list"></div>
         </section>
+        <div class="section-label">자막 파일 · 1~2개 선택</div>
         <div id="file-list" class="card-list"></div>
         <div id="upload-section">
             <label class="btn btn-secondary">
@@ -87,38 +88,48 @@
                 <input type="file" id="file-upload" accept=".srt,.smi" hidden>
             </label>
         </div>
-        <button id="btn-start" class="btn btn-primary" disabled>시작</button>
-
+        <div class="action-bar">
+            <button id="btn-start" class="btn btn-primary" disabled>시작</button>
+        </div>
     </div>
 
     <!-- View 3: Subtitle Viewer -->
     <div id="view-reader" class="view">
-        <header>
+        <header class="reader-header">
             <button id="btn-back-files" class="btn-icon">&larr;</button>
             <span id="position-indicator">1 / 1</span>
-            <button id="btn-settings" class="btn-icon">&#9881;</button>
-            <button id="btn-home" class="btn-icon" title="홈으로">&#8962;</button>
+            <div class="reader-header-actions">
+                <button id="btn-settings" class="btn-icon">&#9881;</button>
+                <button id="btn-home" class="btn-icon" title="홈으로">&#8962;</button>
+            </div>
         </header>
 
         <div id="loop-indicator" class="loop-indicator hidden">
-            <span id="loop-indicator-text"></span>
-            <button id="btn-loop-cancel" class="btn-icon loop-cancel">&times;</button>
-        </div>
-
-        <div id="audio-container" class="hidden">
-            <audio id="audio-player" controls preload="metadata"></audio>
+            <button id="loop-indicator-main" class="loop-indicator-main" title="구간 편집">
+                <span class="loop-indicator-icon">&#8644;</span>
+                <span id="loop-indicator-text"></span>
+            </button>
+            <button id="btn-loop-replay" class="btn-icon loop-replay" title="처음부터 다시">&#8635;</button>
+            <button id="btn-loop-cancel" class="btn-icon loop-cancel" title="구간반복 끄기">&times;</button>
         </div>
 
         <div id="subtitle-display">
             <div id="card-primary" class="subtitle-card primary"></div>
+            <div class="stage-divider"></div>
             <div id="card-secondary" class="subtitle-card secondary"></div>
         </div>
 
-        <nav id="nav-controls">
-            <button id="btn-prev" class="btn-nav">&larr;</button>
-            <button id="btn-next" class="btn-nav">&rarr;</button>
-            <button id="btn-loop" class="btn-nav btn-loop hidden" title="구간반복">&#8644;</button>
-        </nav>
+        <div class="reader-dock">
+            <div id="audio-container" class="hidden">
+                <audio id="audio-player" controls preload="metadata"></audio>
+            </div>
+
+            <nav id="nav-controls">
+                <button id="btn-prev" class="btn-nav">&larr;</button>
+                <button id="btn-loop" class="btn-nav btn-loop hidden" title="구간반복">&#8644;</button>
+                <button id="btn-next" class="btn-nav">&rarr;</button>
+            </nav>
+        </div>
 
         <!-- Settings Panel -->
         <div id="settings-panel" class="panel hidden">
@@ -183,6 +194,21 @@
             </header>
             <div id="loop-selection-summary" class="loop-selection-summary">
                 시작 자막과 종료 자막을 선택하세요
+            </div>
+            <div class="loop-options">
+                <div class="loop-option-group">
+                    <span class="loop-option-label">반복</span>
+                    <button class="loop-opt" data-count="0">&#8734;</button>
+                    <button class="loop-opt" data-count="3">3회</button>
+                    <button class="loop-opt" data-count="5">5회</button>
+                    <button class="loop-opt" data-count="10">10회</button>
+                </div>
+                <div class="loop-option-group">
+                    <span class="loop-option-label">끝 멈춤</span>
+                    <button class="loop-opt" data-gap="0">없음</button>
+                    <button class="loop-opt" data-gap="1">1초</button>
+                    <button class="loop-opt" data-gap="2">2초</button>
+                </div>
             </div>
         </div>
         <div class="loop-body">

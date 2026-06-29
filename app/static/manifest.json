@@ -3,8 +3,8 @@
     "short_name": "자막 뷰어",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#111827",
-    "theme_color": "#1a1a2e",
+    "background_color": "#0b0d10",
+    "theme_color": "#0b0d10",
     "icons": [
         {
             "src": "icons/icon-192.png",
