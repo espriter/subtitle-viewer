@@ -157,3 +157,48 @@ SRS 스케줄러, 통계 대시보드, 오디오 오프라인 캐싱, 프론트 
    블라인드 토글 → 자막 blur → 탭 공개.
 9. **[복습 재생]** 라이딩 뷰 "🔁 복습 재생" → 마킹 문장이 시간순 2회씩 재생 → 완주 시 정지.
 10. **[회귀]** 일반 Reader에서 이어폰 prev/next가 기존대로 자막 이전/다음으로 동작하는가.
+11. **[자막 선택]** 라이딩 뷰 "자막" 칩에서 2nd 탭 → `commute-now` 텍스트가 즉시 2nd 자막으로
+    바뀌는가. 단일 자막 폴더에서는 이 칩 행이 아예 안 보이는가.
+12. **[자막 선택 영속]** 2nd로 바꾼 뒤 새로고침/폴더 재진입해도 선택이 유지되는가.
+13. **[홈 버튼]** 구간반복 설정/라이딩/리뷰 화면에서 새로 생긴 ⌂ 버튼을 누르면 (뒤로 여러 번
+    없이) 바로 홈 화면으로 가는가. 라이딩 중 눌렀을 때 진행률이 저장되는가(홈 카드에 반영).
+
+## Addendum (2026-07-03b): 자막 선택 토글 + 홈 버튼 통합
+
+**배경**: 라이딩 화면 미리보기(`commute-now`)가 1st 자막(en)에 고정돼 있어 2nd(ko)로 보고
+싶어도 방법이 없었음. 또한 홈으로 돌아가는 길이 화면마다 제각각(구간반복/라이딩/리뷰엔
+"뒤로"만 있고 "홈"이 없음)이라 여러 번 눌러야 했음.
+
+**자막 선택** (`state.settings.commuteSubtitle: "primary" | "secondary"`, 기본 `"primary"`):
+- 라이딩 스테이지의 기존 "배속" 칩 행과 동일한 패턴으로 "자막" 칩 행(`[1st] [2nd]`)을
+  `commute-rate-row` 바로 위에 추가. 기존 `[data-rate]`/`[data-commute-min]` 토글 그룹과
+  동일한 코드 경로(`applySettings()`에서 active 클래스 반영, 클릭 시 `saveSettings()`)를 재사용.
+- 2nd 자막이 없는 폴더(단일 자막 선택)에서는 이 행 전체를 숨김(`state.subtitles.secondary`가
+  비어있으면 `.hidden`).
+- `updateCommuteNow(t)`가 `state.settings.commuteSubtitle`에 따라 `state.subtitles.primary`
+  또는 `.secondary`를 참조하도록 변경. 클릭 즉시 `updateCommuteNow()`를 재호출해 다음
+  timeupdate를 기다리지 않고 반영.
+- 리뷰 모드(en+ko 이중 표시)와 복습 재생(마킹 재생)에는 영향 없음 — 라이딩 미리보기 1줄에만
+  적용되는 범위.
+
+**홈 버튼 통합**: 구간반복 설정(`view-loop`)/라이딩(`view-commute`)/리뷰(`view-review`) 헤더의
+"뒤로(←)" 옆에 동일한 ⌂ 홈 버튼을 추가. 기존 Reader의 `#btn-home`과 `exitCommute`/`exitReview`의
+home 분기 로직을 공통 함수로 통합:
+
+```js
+function goHome() {
+    saveStudy(true);   // 라이딩 진행 저장(비-라이딩 상태면 no-op)
+    cancelLoop();       // 구간반복/리뷰 loop 정리(no-op 안전)
+    state.mode = "reader";
+    updateMediaSession();
+    showView("movies");
+    showHomeScreen();
+    loadMovies();
+}
+```
+
+모든 ⌂ 버튼에 `.btn-home` 클래스를 추가해 `font-size 22px→26px`, `padding 4px 8px→6px 10px`로
+탭 영역만 확대(다른 아이콘 버튼은 변경 없음 — 요청 범위 밖).
+
+**Out of Scope (이 addendum)**: 자막 3단 표시(1st+2nd 동시), 화면별 커스텀 홈 동작 분기,
+아이콘 크기 전역 설정화.
