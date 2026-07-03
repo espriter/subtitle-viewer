@@ -633,7 +633,8 @@ header h1 {
 .time-jump-feedback.hidden { display: none; }
 
 /* ===== Loop Setup View ===== */
-#view-loop.active {
+#view-loop.active,
+#view-review.active {
     padding: 16px 16px 0;
     height: 100dvh;
     max-height: 100dvh;
@@ -822,6 +823,214 @@ header h1 {
     pointer-events: none;
 }
 .loop-scrubber-label.hidden { display: none; }
+
+/* ===== Playback rate chips ===== */
+.rate-group { flex-wrap: wrap; justify-content: flex-end; }
+.rate-group .btn-option {
+    padding: 6px 9px;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ===== Commute View (라이딩 모드) ===== */
+#view-commute.active {
+    background:
+        radial-gradient(120% 70% at 50% 0%, #101319 0%, var(--bg) 68%);
+}
+
+.commute-sessions { margin-bottom: 10px; }
+
+.commute-session-list {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+}
+
+.session-chip {
+    min-width: 118px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    color: var(--text);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    text-align: left;
+    font-family: inherit;
+    flex-shrink: 0;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.session-chip.current {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.session-chip.done { opacity: 0.5; }
+.session-chip.done.current { opacity: 1; }
+
+.session-chip-title { font-size: 13px; font-weight: 650; }
+.session-chip.done .session-chip-title { color: var(--loop-a); }
+
+.session-chip-meta {
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.commute-stage {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    text-align: center;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.commute-summary {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.commute-play {
+    width: 104px;
+    height: 104px;
+    border-radius: 50%;
+    border: none;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-size: 38px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, transform 0.1s;
+}
+
+.commute-play:active { transform: scale(0.96); }
+
+.commute-play.playing {
+    background: var(--surface-alt);
+    color: var(--accent);
+    border: 2px solid var(--accent);
+}
+
+.commute-now {
+    min-height: 44px;
+    max-width: 34ch;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.4;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+}
+
+.commute-sub-actions { display: flex; gap: 8px; }
+.commute-sub-actions .hidden { display: none; }
+
+.commute-rate-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.commute-rate-row .rate-group { justify-content: center; }
+
+.commute-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    max-width: 34ch;
+    line-height: 1.5;
+}
+
+/* ===== Review View (리뷰 모드) ===== */
+.review-session-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 2px 0;
+}
+
+.review-session-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 200px;
+    text-align: center;
+}
+
+.review-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.review-card-head .loop-card-time { flex: 1; margin-bottom: 0; }
+
+.review-badge {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid rgba(245,196,81,0.3);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 8px;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+}
+
+.review-badge.hot {
+    background: var(--accent);
+    color: var(--accent-ink);
+}
+
+.review-done-btn {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 2px 9px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.review-done-btn.active {
+    background: var(--loop-a);
+    border-color: var(--loop-a);
+    color: #05291c;
+    font-weight: 700;
+}
+
+.loop-card.review-done { opacity: 0.45; }
+
+.loop-card.playing {
+    border-color: var(--loop-a);
+    border-left-color: var(--loop-a);
+    background: rgba(52,211,153,0.08);
+}
+
+/* 블라인드 모드: 영어 자막을 가리고 듣기 시도 → 탭으로 공개 */
+.review-blind .loop-card-text {
+    filter: blur(7px);
+    transition: filter 0.2s;
+}
+.review-blind .loop-card.revealed .loop-card-text { filter: none; }
+
+.review-empty {
+    color: var(--text-muted);
+    font-size: 14px;
+    text-align: center;
+    padding: 32px 0;
+}
 
 /* ===== Responsive ===== */
 @media (min-width: 768px) {

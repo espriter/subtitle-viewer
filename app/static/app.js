@@ -20,6 +20,10 @@
             autoSync: true,
             loopCount: 0,   // 0 = 무한 반복, N = N회 후 정지
             loopGap: 0,     // 구간 끝(B)에서 멈췄다 되감기까지 초
+            playbackRate: 1,
+            commuteTargetMin: 15,     // 가상 세션 목표 길이(분)
+            sessionEndPause: true,    // 세션 경계 도달 시 일시정지
+            commuteSwapButtons: false, // 이어폰 prev/next 의미 스왑 (AirPods 대응)
         },
         uploadEnabled: true,
         audioFile: null,
@@ -32,6 +36,25 @@
             _finished: false, // loopCount 도달로 종료됨
             _waiting: false,  // 끝 멈춤(gap) 대기 중
             _gapTimer: null,
+        },
+        mode: "reader",  // "reader" | "commute" | "review" — 재생 모드 (Media Session 매핑 분기)
+        commuteFrom: "home", // 라이딩 모드 진입 경로 ("home" | "reader")
+        study: {
+            movie: null,     // study 데이터가 로드된 영화
+            data: null,      // localStorage 영속 레코드 (progressSec/resumeSec/cues)
+            sessions: [],    // Segmenter.computeSessions 결과 (메모이즈)
+            currentIndex: 0, // 현재 세션 포인터 (resumeSec에서 파생)
+        },
+        review: {
+            sessionIndex: 0,
+            filter: "marked", // "marked" | "all"
+            blind: false,
+            from: "home",     // 리뷰 진입 경로 ("home" | "commute")
+        },
+        playlist: {
+            cues: [],   // 마킹 문장 복습 재생 대기열 (큐 인덱스, 시간순)
+            pos: 0,
+            active: false,
         },
     };
 
@@ -83,6 +106,8 @@
         files: $("#view-files"),
         reader: $("#view-reader"),
         loop: $("#view-loop"),
+        commute: $("#view-commute"),
+        review: $("#view-review"),
     };
 
     // --- View switching ---
@@ -100,6 +125,8 @@
     function showHomeScreen() {
         $("#home-screen").classList.remove("hidden");
         $("#movie-list-section").classList.add("hidden");
+        updateResumeCard();
+        updateStudyCards();
     }
 
     function showMovieListSection() {
@@ -146,9 +173,11 @@
         }
     }
 
-    async function resumeSession() {
+    // Load movie/files/subtitles/chapters from the saved session record.
+    // Shared by resume (reader) and commute/review entry from home.
+    async function loadFromSavedSession() {
         const session = loadSession();
-        if (!session) return;
+        if (!session) return null;
 
         state.currentMovie = session.movie;
         state.selectedFiles = session.files;
@@ -156,6 +185,7 @@
         // Detect MP3 audio file for this movie
         const allFiles = await api.getFiles(state.currentMovie);
         state.audioFile = allFiles.find(f => f.endsWith('.mp3')) || null;
+        state.chapters = await api.getChapters(state.currentMovie);
 
         state.subtitles.primary = await api.getSubtitles(
             state.currentMovie,
@@ -165,6 +195,12 @@
             state.selectedFiles.length > 1
                 ? await api.getSubtitles(state.currentMovie, state.selectedFiles[1])
                 : [];
+        return session;
+    }
+
+    async function resumeSession() {
+        const session = await loadFromSavedSession();
+        if (!session) return;
 
         state.position = Math.min(session.position, state.subtitles.primary.length - 1);
         setupAudio();
@@ -173,6 +209,147 @@
         }
         renderSubtitles();
         showView("reader");
+    }
+
+    // --- Study store (라이딩/리뷰 학습 기록, per-movie localStorage) ---
+    const STUDY_KEY_PREFIX = "subtitle-viewer-study:";
+
+    function studyKey(movie) {
+        return STUDY_KEY_PREFIX + movie;
+    }
+
+    function loadStudy(movie) {
+        try {
+            const raw = localStorage.getItem(studyKey(movie));
+            if (!raw) return null;
+            const data = JSON.parse(raw);
+            return data && data.v === 1 ? data : null;
+        } catch {
+            return null;
+        }
+    }
+
+    let lastStudySaveAt = 0;
+    // 라이딩 중 timeupdate마다 불리므로 기본 5초 스로틀; force=true는 즉시 저장.
+    function saveStudy(force) {
+        const st = state.study;
+        if (!st.data || !st.movie) return;
+        const now = Date.now();
+        if (!force && now - lastStudySaveAt < 5000) return;
+        lastStudySaveAt = now;
+        st.data.updatedAt = new Date().toISOString();
+        if (st.sessions.length > 0) {
+            const idx = sessionIndexForSec(st.data.resumeSec || 0);
+            const sess = st.sessions[idx];
+            st.data.summary = {
+                sessionCount: st.sessions.length,
+                currentSession: idx + 1,
+                remainSec: Math.max(0, Math.round(sess.endSec - Math.max(st.data.resumeSec || 0, sess.startSec))),
+            };
+        }
+        localStorage.setItem(studyKey(st.movie), JSON.stringify(st.data));
+    }
+
+    // 현재 영화의 study 레코드를 로드/초기화. 자막 교체 감지 포함.
+    function ensureStudy() {
+        const movie = state.currentMovie;
+        const cueCount = state.subtitles.primary.length;
+        const srtFile = state.selectedFiles[0] || null;
+
+        if (state.study.movie === movie && state.study.data) return;
+
+        let data = loadStudy(movie);
+        if (data && (data.cueCount !== cueCount || data.srtFile !== srtFile)) {
+            const reset = confirm(
+                "자막 구성이 바뀐 것 같습니다. 학습 기록(마킹/진도)을 초기화할까요?\n(취소하면 기존 기록을 그대로 사용합니다)"
+            );
+            if (reset) {
+                data = null;
+            } else {
+                data.srtFile = srtFile;
+                data.cueCount = cueCount;
+            }
+        }
+        if (!data) {
+            data = { v: 1, srtFile, cueCount, progressSec: 0, resumeSec: 0, cues: {} };
+        }
+        state.study.movie = movie;
+        state.study.data = data;
+        state.study.sessions = [];
+    }
+
+    function computeStudySessions() {
+        const chapterStarts = (state.chapters || [])
+            .map((c) => c.start_seconds)
+            .filter((s) => typeof s === "number");
+        state.study.sessions = Segmenter.computeSessions(state.subtitles.primary, {
+            targetSec: state.settings.commuteTargetMin * 60,
+            chapterStarts,
+        });
+    }
+
+    function sessionIndexForSec(sec) {
+        const ss = state.study.sessions;
+        for (let i = 0; i < ss.length; i++) {
+            if (sec < ss[i].endSec) return i;
+        }
+        return Math.max(0, ss.length - 1);
+    }
+
+    function isSessionCompleted(sess) {
+        return state.study.data && sess.endSec <= (state.study.data.progressSec || 0) + 0.01;
+    }
+
+    function markedCuesInOrder() {
+        const data = state.study.data;
+        if (!data) return [];
+        return Object.keys(data.cues)
+            .filter((k) => data.cues[k].r > 0)
+            .map(Number)
+            .sort((a, b) => a - b);
+    }
+
+    function countMarkedCues(data) {
+        if (!data || !data.cues) return 0;
+        return Object.keys(data.cues).filter((k) => data.cues[k].r > 0).length;
+    }
+
+    // 홈 화면 라이딩/리뷰 카드 상태 갱신 (localStorage만 읽음)
+    function updateStudyCards() {
+        const session = loadSession();
+        const commuteCard = $("#menu-commute");
+        const reviewCard = $("#menu-review");
+        const commuteDesc = $("#commute-desc");
+        const reviewDesc = $("#review-desc");
+        if (!commuteCard || !reviewCard) return;
+
+        if (!session) {
+            commuteCard.classList.add("disabled");
+            reviewCard.classList.add("disabled");
+            commuteDesc.textContent = "저장된 세션이 없습니다";
+            reviewDesc.textContent = "저장된 세션이 없습니다";
+            return;
+        }
+
+        const study = loadStudy(session.movie);
+        commuteCard.classList.remove("disabled");
+        if (study && study.summary) {
+            const s = study.summary;
+            const remainMin = Math.max(1, Math.round(s.remainSec / 60));
+            commuteDesc.textContent =
+                `${session.movie} · 세션 ${s.currentSession}/${s.sessionCount} · 남은 ${remainMin}분`;
+        } else {
+            commuteDesc.textContent = `${session.movie} · 처음부터`;
+        }
+
+        const marked = countMarkedCues(study);
+        if (marked > 0) {
+            reviewCard.classList.remove("disabled");
+            reviewDesc.textContent = `${session.movie} · 다시들은 문장 ${marked}개`;
+        } else {
+            reviewCard.classList.add("disabled");
+            reviewDesc.textContent = "마킹된 문장이 없습니다";
+        }
     }
 
     // --- View 1: Movies ---
@@ -230,6 +407,7 @@
         state.currentMovie = movie;
         state.selectedFiles = [];
         state.selectedChapterIndex = null;
+        stopPlaylist(false);
         cancelLoop();
         $("#movie-title").textContent = movie;
         state.files = await api.getFiles(movie);
@@ -333,7 +511,9 @@
 
     // --- View 3: Reader ---
     async function startReader() {
+        stopPlaylist(false);
         cancelLoop();
+        state.mode = "reader";
         state.subtitles.primary = await api.getSubtitles(
             state.currentMovie,
             state.selectedFiles[0]
@@ -477,6 +657,8 @@
             audio.load();
             const btnLoop = $("#btn-loop");
             if (btnLoop) btnLoop.classList.add("hidden");
+            const btnCommute = $("#btn-commute");
+            if (btnCommute) btnCommute.classList.add("hidden");
             return;
         }
 
@@ -497,8 +679,65 @@
         audio.removeEventListener("error", onAudioError);
         audio.addEventListener("error", onAudioError);
 
+        // src 교체 후 load()가 playbackRate를 리셋하는 브라우저 대응
+        audio.removeEventListener("loadedmetadata", onAudioLoadedMetadata);
+        audio.addEventListener("loadedmetadata", onAudioLoadedMetadata);
+
+        audio.removeEventListener("play", onAudioPlayState);
+        audio.addEventListener("play", onAudioPlayState);
+        audio.removeEventListener("pause", onAudioPause);
+        audio.addEventListener("pause", onAudioPause);
+
+        applyPlaybackRate();
+
         const btnLoop = $("#btn-loop");
         if (btnLoop) btnLoop.classList.remove("hidden");
+        const btnCommute = $("#btn-commute");
+        if (btnCommute) btnCommute.classList.remove("hidden");
+    }
+
+    function applyPlaybackRate() {
+        const audio = $("#audio-player");
+        const rate = state.settings.playbackRate || 1;
+        audio.playbackRate = rate;
+        audio.preservesPitch = true;
+        audio.webkitPreservesPitch = true;
+        $$("[data-rate]").forEach((b) => {
+            b.classList.toggle("active", parseFloat(b.dataset.rate) === rate);
+        });
+    }
+
+    function onAudioLoadedMetadata() {
+        applyPlaybackRate();
+        updatePositionState();
+    }
+
+    function onAudioPlayState() {
+        updateCommutePlayButton();
+        updatePositionState();
+    }
+
+    function onAudioPause() {
+        // 이어폰 분리 시 iOS가 자동 pause → 진행 위치 즉시 저장
+        if (state.mode === "commute") saveStudy(true);
+        updateCommutePlayButton();
+        updatePositionState();
+    }
+
+    // 잠금화면 스크러버 정합 (지원 브라우저 한정)
+    function updatePositionState() {
+        if (!("mediaSession" in navigator) || !navigator.mediaSession.setPositionState) return;
+        const audio = $("#audio-player");
+        if (!audio.duration || !isFinite(audio.duration)) return;
+        try {
+            navigator.mediaSession.setPositionState({
+                duration: audio.duration,
+                playbackRate: audio.playbackRate,
+                position: Math.min(audio.currentTime, audio.duration),
+            });
+        } catch {
+            // 일부 브라우저는 유효성 검사로 throw — 무시
+        }
     }
 
     function onTimeUpdate() {
@@ -516,6 +755,10 @@
                 handleLoopBoundary();
                 return;
             }
+        }
+
+        if (state.mode === "commute") {
+            handleCommuteTick(t);
         }
 
         if (!state.settings.autoSync) return;
@@ -546,12 +789,21 @@
         const audio = $("#audio-player");
 
         // Count handling: stop after loopCount repeats.
-        if (state.settings.loopCount > 0) {
+        // 복습 플레이리스트 중에는 문장당 2회 고정 후 다음 문장으로 넘어간다.
+        const playlistActive = state.playlist.active;
+        const count = playlistActive ? 2 : state.settings.loopCount;
+        if (count > 0) {
             state.loop._done += 1;
-            if (state.loop._done >= state.settings.loopCount) {
+            if (state.loop._done >= count) {
+                if (playlistActive) {
+                    advancePlaylist();
+                    return;
+                }
                 audio.pause();
                 state.loop._finished = true;
                 updateLoopIndicator();
+                // 리뷰 뷰에서는 카드의 재생 하이라이트를 해제
+                if (views.review.classList.contains("active")) renderReviewList();
                 return;
             }
         }
@@ -597,8 +849,9 @@
     function updateMediaSession() {
         if (!("mediaSession" in navigator) || !state.audioFile) return;
 
+        const commute = state.mode === "commute";
         navigator.mediaSession.metadata = new MediaMetadata({
-            title: state.currentMovie || "자막 뷰어",
+            title: (state.currentMovie || "자막 뷰어") + (commute ? " · 라이딩" : ""),
             artist: "자막 뷰어",
         });
 
@@ -608,11 +861,25 @@
         navigator.mediaSession.setActionHandler("pause", () => {
             $("#audio-player").pause();
         });
+        // 라이딩 모드: ⏮ = 현재 문장 다시듣기(자동 마킹), ⏭ = 다음 문장 스킵.
+        // 핸들러가 호출 시점에 state.mode를 읽으므로 모드 전환 시 재등록 불필요.
+        // seekforward/backward는 등록하지 않는다 — iOS 잠금화면에서 prev/next
+        // 버튼이 시크 화살표로 대체되는 것을 막기 위함.
         navigator.mediaSession.setActionHandler("previoustrack", () => {
-            navigate(-1);
+            if (state.mode === "commute") {
+                if (state.settings.commuteSwapButtons) skipToNextSentence();
+                else replayCurrentSentence();
+            } else {
+                navigate(-1);
+            }
         });
         navigator.mediaSession.setActionHandler("nexttrack", () => {
-            navigate(1);
+            if (state.mode === "commute") {
+                if (state.settings.commuteSwapButtons) replayCurrentSentence();
+                else skipToNextSentence();
+            } else {
+                navigate(1);
+            }
         });
     }
 
@@ -665,6 +932,28 @@
         $$("[data-mode]").forEach((btn) => {
             btn.classList.toggle("active", btn.dataset.mode === state.settings.navMode);
         });
+        $$("[data-rate]").forEach((btn) => {
+            btn.classList.toggle(
+                "active",
+                parseFloat(btn.dataset.rate) === (state.settings.playbackRate || 1)
+            );
+        });
+        $$("[data-commute-min]").forEach((btn) => {
+            btn.classList.toggle(
+                "active",
+                parseInt(btn.dataset.commuteMin) === state.settings.commuteTargetMin
+            );
+        });
+        const pauseBtn = $("#btn-session-end-pause");
+        if (pauseBtn) {
+            pauseBtn.textContent = state.settings.sessionEndPause ? "ON" : "OFF";
+            pauseBtn.classList.toggle("active", state.settings.sessionEndPause);
+        }
+        const swapBtn = $("#btn-commute-swap");
+        if (swapBtn) {
+            swapBtn.textContent = state.settings.commuteSwapButtons ? "ON" : "OFF";
+            swapBtn.classList.toggle("active", state.settings.commuteSwapButtons);
+        }
     }
 
     // --- Upload ---
@@ -1088,6 +1377,503 @@
         $("#loop-indicator").classList.add("hidden");
     }
 
+    // ============================================================
+    // 라이딩 모드 (Commute) — 화면 없이 이어폰 버튼만으로 듣기 연습
+    // ============================================================
+
+    function formatClock(sec) {
+        const s = Math.max(0, Math.floor(sec));
+        const h = String(Math.floor(s / 3600)).padStart(2, "0");
+        const m = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+        const ss = String(s % 60).padStart(2, "0");
+        return `${h}:${m}:${ss}`;
+    }
+
+    async function enterCommuteFromHome() {
+        const session = await loadFromSavedSession();
+        if (!session) return;
+        if (!state.audioFile) {
+            alert("이 폴더에는 오디오(mp3)가 없어 라이딩 모드를 쓸 수 없습니다.");
+            return;
+        }
+        setupAudio();
+        state.commuteFrom = "home";
+        enterCommute();
+    }
+
+    function enterCommute() {
+        if (!state.audioFile || state.subtitles.primary.length === 0) return;
+        stopPlaylist(false);
+        cancelLoop();
+        state.mode = "commute";
+        ensureStudy();
+        if (state.study.sessions.length === 0) computeStudySessions();
+        state.study.currentIndex = sessionIndexForSec(state.study.data.resumeSec || 0);
+        updateMediaSession();
+        renderCommuteSessions();
+        updateCommuteSummary();
+        updateCommutePlayButton();
+        showView("commute");
+    }
+
+    function exitCommute() {
+        state.mode = "reader";
+        saveStudy(true);
+        updateMediaSession();
+        if (state.commuteFrom === "reader") {
+            showView("reader");
+        } else {
+            showView("movies");
+            showHomeScreen();
+        }
+    }
+
+    function renderCommuteSessions() {
+        const list = $("#commute-session-list");
+        if (!list) return;
+        list.innerHTML = "";
+        state.study.sessions.forEach((sess, i) => {
+            const el = document.createElement("button");
+            el.type = "button";
+            el.className = "session-chip";
+            const done = isSessionCompleted(sess);
+            if (done) el.classList.add("done");
+            if (i === state.study.currentIndex) el.classList.add("current");
+
+            const title = document.createElement("span");
+            title.className = "session-chip-title";
+            title.textContent = `세션 ${i + 1}${done ? " ✓" : ""}`;
+
+            const meta = document.createElement("span");
+            meta.className = "session-chip-meta";
+            const dur = Math.round((sess.endSec - sess.startSec) / 60);
+            meta.textContent = `${formatClock(sess.startSec)} · ${dur}분`;
+
+            el.appendChild(title);
+            el.appendChild(meta);
+            el.addEventListener("click", () => selectCommuteSession(i));
+            list.appendChild(el);
+        });
+        const cur = list.children[state.study.currentIndex];
+        if (cur) cur.scrollIntoView({ inline: "center", block: "nearest" });
+    }
+
+    function selectCommuteSession(i) {
+        stopPlaylist(false);
+        state.study.currentIndex = i;
+        renderCommuteSessions();
+        updateCommuteSummary();
+    }
+
+    function updateCommuteSummary() {
+        const el = $("#commute-summary");
+        if (!el) return;
+        const sess = state.study.sessions[state.study.currentIndex];
+        if (!sess) {
+            el.textContent = "";
+            return;
+        }
+        const dur = Math.round((sess.endSec - sess.startSec) / 60);
+        let line = `세션 ${state.study.currentIndex + 1}/${state.study.sessions.length}` +
+            ` · ${formatClock(sess.startSec)} ~ ${formatClock(sess.endSec)} (${dur}분)`;
+        const resume = state.study.data ? state.study.data.resumeSec || 0 : 0;
+        if (resume > sess.startSec + 1 && resume < sess.endSec - 1) {
+            line += ` · 이어서 ${formatClock(resume)}`;
+        }
+        el.textContent = line;
+
+        const plBtn = $("#btn-commute-playlist");
+        if (plBtn) {
+            const marked = markedCuesInOrder().length;
+            plBtn.classList.toggle("hidden", marked === 0 && !state.playlist.active);
+            plBtn.textContent = state.playlist.active
+                ? "⏹ 복습 중지"
+                : `🔁 복습 재생 (${marked}문장)`;
+        }
+    }
+
+    function updateCommutePlayButton() {
+        const btn = $("#btn-commute-play");
+        if (!btn) return;
+        const audio = $("#audio-player");
+        const playing = !audio.paused;
+        btn.innerHTML = playing ? "&#10074;&#10074;" : "&#9654;";
+        btn.classList.toggle("playing", playing);
+    }
+
+    // fromStart=false면 resumeSec에서 이어듣기 (세션 밖이면 세션 처음부터)
+    function startCommutePlayback(fromStart) {
+        const audio = $("#audio-player");
+        const sess = state.study.sessions[state.study.currentIndex];
+        if (!sess || !state.study.data) return;
+        stopPlaylist(false);
+        let t = fromStart
+            ? sess.startSec
+            : Math.max(state.study.data.resumeSec || 0, sess.startSec);
+        if (t >= sess.endSec - 1 || t < sess.startSec) t = sess.startSec;
+        audio.currentTime = Math.max(0, t - state.settings.syncOffset);
+        audio.play().catch(() => {});
+        state.study.data.resumeSec = t;
+        updateCommuteSummary();
+    }
+
+    // onTimeUpdate에서 호출 — t는 자막 시간 도메인 (currentTime + syncOffset)
+    function handleCommuteTick(t) {
+        const st = state.study;
+        const sess = st.sessions[st.currentIndex];
+        if (!sess || !st.data) return;
+        if (state.playlist.active) return; // 복습 재생은 루프 엔진이 관리
+
+        st.data.resumeSec = t;
+        // 진도 워터마크는 현재 세션 끝까지만 — 앞으로 시크해도 미래 세션이 완료 처리되지 않게
+        st.data.progressSec = Math.max(st.data.progressSec || 0, Math.min(t, sess.endSec));
+        saveStudy(); // 5초 스로틀
+
+        if (views.commute.classList.contains("active")) {
+            updateCommuteNow(t);
+        }
+
+        const audio = $("#audio-player");
+        if (t >= sess.endSec && !audio.paused) {
+            completeCommuteSession(sess);
+        }
+    }
+
+    function updateCommuteNow(t) {
+        const el = $("#commute-now");
+        if (!el) return;
+        const idx = findSubtitleAtTime(state.subtitles.primary, t);
+        el.textContent = idx >= 0
+            ? state.subtitles.primary[idx].text.replace(/\n/g, " ")
+            : "";
+    }
+
+    function completeCommuteSession(sess) {
+        const audio = $("#audio-player");
+        const st = state.study;
+        st.data.progressSec = Math.max(st.data.progressSec || 0, sess.endSec);
+        const isLast = st.currentIndex >= st.sessions.length - 1;
+        if (!isLast) {
+            st.currentIndex += 1;
+            st.data.resumeSec = st.sessions[st.currentIndex].startSec;
+        }
+        if (state.settings.sessionEndPause || isLast) {
+            audio.pause();
+            if (!isLast) {
+                // 다음 세션 시작점으로 미리 시크 — 이어폰 play 한 번이면 다음 세션
+                audio.currentTime = Math.max(0, st.data.resumeSec - state.settings.syncOffset);
+            }
+        }
+        saveStudy(true);
+        renderCommuteSessions();
+        updateCommuteSummary();
+    }
+
+    // 이어폰 ⏮ — 현재 문장 처음부터 다시 + 암묵 마킹(replayCount++)
+    let lastReplayAt = 0;
+    function replayCurrentSentence() {
+        const now = Date.now();
+        if (now - lastReplayAt < 300) return; // 이어버드 더블 파이어 디바운스
+        lastReplayAt = now;
+
+        const audio = $("#audio-player");
+        const subs = state.subtitles.primary;
+        if (subs.length === 0) return;
+        const t = audio.currentTime + state.settings.syncOffset;
+        let idx = findSubtitleAtTime(subs, t);
+        if (idx < 0) {
+            idx = 0;
+        } else if (idx > 0 && t - timeToSeconds(subs[idx].start) < 1.0) {
+            // 반응시간 보정: 큐 시작 1초 이내에 눌렀다면 의도는 "방금 끝난 문장"
+            idx -= 1;
+        }
+
+        bumpReplayCount(idx);
+        if (state.playlist.active) state.loop._done = 0; // 재청취는 반복 카운트 리셋
+        audio.currentTime = Math.max(0, audioTimeForSubtitleStart(idx) - 0.3);
+        audio.play().catch(() => {});
+    }
+
+    // 이어폰 ⏭ — 다음 문장으로 스킵 (마킹 없음)
+    function skipToNextSentence() {
+        if (state.playlist.active) {
+            advancePlaylist();
+            return;
+        }
+        const audio = $("#audio-player");
+        const subs = state.subtitles.primary;
+        if (subs.length === 0) return;
+        const t = audio.currentTime + state.settings.syncOffset;
+        const idx = findSubtitleAtTime(subs, t);
+        const next = Math.min(idx + 1, subs.length - 1);
+        if (next <= idx) return;
+        audio.currentTime = audioTimeForSubtitleStart(next);
+        audio.play().catch(() => {});
+    }
+
+    function bumpReplayCount(idx) {
+        const data = state.study.data;
+        if (!data) return;
+        const key = String(idx);
+        const rec = data.cues[key] || (data.cues[key] = {});
+        rec.r = (rec.r || 0) + 1;
+        saveStudy();
+    }
+
+    // ============================================================
+    // 복습 재생 (마킹 문장 플레이리스트) — 퇴근길 귀-only 재검증
+    // 마킹 큐를 시간순으로 문장당 2회씩 루프 엔진에 물려 재생한다.
+    // ============================================================
+
+    function toggleMarkedPlaylist() {
+        if (state.playlist.active) {
+            stopPlaylist(true);
+        } else {
+            startMarkedPlaylist();
+        }
+    }
+
+    function startMarkedPlaylist() {
+        const cues = markedCuesInOrder();
+        if (cues.length === 0) return;
+        cancelLoop();
+        state.playlist.cues = cues;
+        state.playlist.pos = 0;
+        state.playlist.active = true;
+        playPlaylistCue();
+        updateCommuteSummary();
+    }
+
+    function playPlaylistCue() {
+        const idx = state.playlist.cues[state.playlist.pos];
+        state.loop.startIndex = idx;
+        state.loop.endIndex = idx;
+        state.loop.active = true;
+        state.loop._done = 0;
+        state.loop._finished = false;
+        state.loop._waiting = false;
+        seekToLoopStart();
+    }
+
+    function advancePlaylist() {
+        state.playlist.pos += 1;
+        if (state.playlist.pos >= state.playlist.cues.length) {
+            stopPlaylist(true); // 완주 → 정지
+            return;
+        }
+        playPlaylistCue();
+    }
+
+    function stopPlaylist(pauseAudio) {
+        const wasActive = state.playlist.active;
+        state.playlist.active = false;
+        state.playlist.cues = [];
+        state.playlist.pos = 0;
+        if (wasActive) {
+            cancelLoop();
+            if (pauseAudio) $("#audio-player").pause();
+            updateCommuteSummary();
+        }
+    }
+
+    // ============================================================
+    // 리뷰 모드 — 마킹한 문장을 이중자막 + 문장 루프로 집중 복습
+    // ============================================================
+
+    async function enterReviewFromHome() {
+        const session = await loadFromSavedSession();
+        if (!session) return;
+        setupAudio();
+        state.review.from = "home";
+        enterReview(null);
+    }
+
+    function enterReview(sessionIdx) {
+        if (state.subtitles.primary.length === 0) return;
+        stopPlaylist(false);
+        cancelLoop();
+        state.mode = "review";
+        ensureStudy();
+        if (state.study.sessions.length === 0) computeStudySessions();
+        if (state.study.sessions.length === 0) return;
+
+        if (sessionIdx === null || sessionIdx === undefined) {
+            // 기본: 가장 최근 마킹이 속한 세션, 없으면 현재 진도 세션
+            const marked = markedCuesInOrder();
+            sessionIdx = marked.length > 0
+                ? sessionIndexForCue(marked[marked.length - 1])
+                : sessionIndexForSec(state.study.data.resumeSec || 0);
+        }
+        state.review.sessionIndex = Math.max(0, Math.min(sessionIdx, state.study.sessions.length - 1));
+        state.review.filter = sessionHasMarks(state.review.sessionIndex) ? "marked" : "all";
+        updateMediaSession();
+        renderLoopOptions();
+        renderReviewList();
+        showView("review");
+    }
+
+    function exitReview() {
+        cancelLoop();
+        if (state.review.from === "commute") {
+            state.mode = "commute";
+            updateMediaSession();
+            renderCommuteSessions();
+            updateCommuteSummary();
+            showView("commute");
+        } else {
+            state.mode = "reader";
+            updateMediaSession();
+            showView("movies");
+            showHomeScreen();
+        }
+    }
+
+    function sessionIndexForCue(cueIdx) {
+        const ss = state.study.sessions;
+        for (let i = 0; i < ss.length; i++) {
+            if (cueIdx <= ss[i].endCue) return i;
+        }
+        return Math.max(0, ss.length - 1);
+    }
+
+    function sessionHasMarks(sessionIdx) {
+        const sess = state.study.sessions[sessionIdx];
+        if (!sess || !state.study.data) return false;
+        const cues = state.study.data.cues;
+        return Object.keys(cues).some((k) => {
+            const i = Number(k);
+            return cues[k].r > 0 && i >= sess.startCue && i <= sess.endCue;
+        });
+    }
+
+    function renderReviewList() {
+        const list = $("#review-list");
+        const sess = state.study.sessions[state.review.sessionIndex];
+        if (!list || !sess) return;
+        const scrollTop = list.scrollTop;
+        const subs = state.subtitles.primary;
+        const secSubs = state.subtitles.secondary;
+        const cuesData = state.study.data.cues;
+
+        list.classList.toggle("review-blind", state.review.blind);
+        list.innerHTML = "";
+
+        let shown = 0;
+        let markedCount = 0;
+        for (let i = sess.startCue; i <= sess.endCue; i++) {
+            const rec = cuesData[String(i)];
+            const replays = rec && rec.r ? rec.r : 0;
+            if (replays > 0) markedCount += 1;
+            if (state.review.filter === "marked" && replays === 0) continue;
+            shown += 1;
+
+            const card = document.createElement("div");
+            card.className = "loop-card review-card";
+            if (rec && rec.d) card.classList.add("review-done");
+            if (state.loop.active && state.loop.startIndex === i && state.loop.endIndex === i) {
+                card.classList.add("playing");
+            }
+
+            const entry = subs[i];
+            const timeStr = entry.start.split(",")[0];
+            let html = '<div class="review-card-head">';
+            html += `<span class="loop-card-time">#${i + 1} · ${timeStr}</span>`;
+            if (replays > 0) {
+                html += `<span class="review-badge${replays >= 2 ? " hot" : ""}">🔁 ${replays}</span>`;
+            }
+            html += `<button type="button" class="review-done-btn${rec && rec.d ? " active" : ""}">✓</button>`;
+            html += "</div>";
+            html += `<div class="loop-card-text">${entry.text.replace(/\n/g, " ")}</div>`;
+            if (secSubs.length > 0) {
+                const secIdx = findSubtitleAtTime(secSubs, timeToSeconds(entry.start));
+                if (secIdx >= 0) {
+                    html += `<div class="loop-card-secondary">${secSubs[secIdx].text.replace(/\n/g, " ")}</div>`;
+                }
+            }
+            card.innerHTML = html;
+
+            card.addEventListener("click", () => toggleReviewPlayback(i));
+            card.querySelector(".review-done-btn").addEventListener("click", (e) => {
+                e.stopPropagation();
+                toggleReviewDone(i);
+            });
+            if (state.review.blind) {
+                card.querySelector(".loop-card-text").addEventListener("click", (e) => {
+                    if (!card.classList.contains("revealed")) {
+                        e.stopPropagation(); // 첫 탭은 공개만, 재생은 그 다음 탭부터
+                        card.classList.add("revealed");
+                    }
+                });
+            }
+            list.appendChild(card);
+        }
+
+        if (shown === 0) {
+            const empty = document.createElement("div");
+            empty.className = "review-empty";
+            empty.textContent = "이 세션에는 다시 들은 문장이 없습니다";
+            list.appendChild(empty);
+        }
+
+        $("#review-session-label").textContent =
+            `세션 ${state.review.sessionIndex + 1}/${state.study.sessions.length}` +
+            ` · 다시들은 문장 ${markedCount}개`;
+        $("#btn-review-filter-marked").classList.toggle("active", state.review.filter === "marked");
+        $("#btn-review-filter-all").classList.toggle("active", state.review.filter === "all");
+        $("#btn-review-blind").classList.toggle("active", state.review.blind);
+        list.scrollTop = scrollTop;
+    }
+
+    // 카드 탭 = 그 문장만 루프 재생 (기존 A-B 엔진, start=end)
+    function toggleReviewPlayback(i) {
+        const audio = $("#audio-player");
+        const isPlaying = state.loop.active &&
+            state.loop.startIndex === i && state.loop.endIndex === i;
+        stopPlaylist(false);
+        cancelLoop();
+        if (isPlaying) {
+            audio.pause();
+        } else if (state.audioFile) {
+            state.loop.startIndex = i;
+            state.loop.endIndex = i;
+            state.loop.active = true;
+            seekToLoopStart();
+        }
+        renderReviewList();
+    }
+
+    function toggleReviewDone(i) {
+        const data = state.study.data;
+        if (!data) return;
+        const key = String(i);
+        const rec = data.cues[key] || (data.cues[key] = {});
+        rec.d = !rec.d;
+        saveStudy(true);
+        renderReviewList();
+    }
+
+    function clearSessionMarks() {
+        const sess = state.study.sessions[state.review.sessionIndex];
+        const data = state.study.data;
+        if (!sess || !data) return;
+        if (!confirm(`세션 ${state.review.sessionIndex + 1}의 마킹을 모두 지울까요?`)) return;
+        Object.keys(data.cues).forEach((k) => {
+            const i = Number(k);
+            if (i >= sess.startCue && i <= sess.endCue) delete data.cues[k];
+        });
+        saveStudy(true);
+        renderReviewList();
+    }
+
+    function navReviewSession(dir) {
+        const next = state.review.sessionIndex + dir;
+        if (next < 0 || next >= state.study.sessions.length) return;
+        cancelLoop();
+        state.review.sessionIndex = next;
+        state.review.filter = sessionHasMarks(next) ? "marked" : "all";
+        renderReviewList();
+    }
+
     // --- Event binding ---
     function bindEvents() {
         // Home menu cards
@@ -1224,6 +2010,84 @@
                 renderLoopOptions();
             });
         });
+
+        // Playback rate (설정 패널 + 라이딩 뷰 공용)
+        $$("[data-rate]").forEach((b) => {
+            b.addEventListener("click", () => {
+                state.settings.playbackRate = parseFloat(b.dataset.rate);
+                applyPlaybackRate();
+                saveSettings();
+                updatePositionState();
+            });
+        });
+
+        // Commute: session length — 변경 시 세션 재계산 (기록은 시간 기준이라 유효 유지)
+        $$("[data-commute-min]").forEach((b) => {
+            b.addEventListener("click", () => {
+                state.settings.commuteTargetMin = parseInt(b.dataset.commuteMin);
+                saveSettings();
+                applySettings();
+                if (state.study.data && state.subtitles.primary.length > 0) {
+                    computeStudySessions();
+                    state.study.currentIndex = sessionIndexForSec(state.study.data.resumeSec || 0);
+                    if (views.commute.classList.contains("active")) {
+                        renderCommuteSessions();
+                        updateCommuteSummary();
+                    }
+                }
+            });
+        });
+
+        $("#btn-session-end-pause").addEventListener("click", () => {
+            state.settings.sessionEndPause = !state.settings.sessionEndPause;
+            saveSettings();
+            applySettings();
+        });
+        $("#btn-commute-swap").addEventListener("click", () => {
+            state.settings.commuteSwapButtons = !state.settings.commuteSwapButtons;
+            saveSettings();
+            applySettings();
+        });
+
+        // Home: 라이딩 / 리뷰 카드
+        $("#menu-commute").addEventListener("click", enterCommuteFromHome);
+        $("#menu-review").addEventListener("click", enterReviewFromHome);
+
+        // Commute view
+        $("#btn-commute").addEventListener("click", () => {
+            state.commuteFrom = "reader";
+            enterCommute();
+        });
+        $("#btn-commute-back").addEventListener("click", exitCommute);
+        $("#btn-commute-open-review").addEventListener("click", () => {
+            state.review.from = "commute";
+            enterReview(state.study.currentIndex);
+        });
+        $("#btn-commute-play").addEventListener("click", () => {
+            const audio = $("#audio-player");
+            if (audio.paused) startCommutePlayback(false);
+            else audio.pause();
+        });
+        $("#btn-commute-restart").addEventListener("click", () => startCommutePlayback(true));
+        $("#btn-commute-playlist").addEventListener("click", toggleMarkedPlaylist);
+
+        // Review view
+        $("#btn-review-back").addEventListener("click", exitReview);
+        $("#btn-review-prev-session").addEventListener("click", () => navReviewSession(-1));
+        $("#btn-review-next-session").addEventListener("click", () => navReviewSession(1));
+        $("#btn-review-filter-marked").addEventListener("click", () => {
+            state.review.filter = "marked";
+            renderReviewList();
+        });
+        $("#btn-review-filter-all").addEventListener("click", () => {
+            state.review.filter = "all";
+            renderReviewList();
+        });
+        $("#btn-review-blind").addEventListener("click", () => {
+            state.review.blind = !state.review.blind;
+            renderReviewList();
+        });
+        $("#btn-review-clear-marks").addEventListener("click", clearSessionMarks);
 
         setupSwipe();
         setupKeyboard();
