@@ -183,19 +183,24 @@
         state.currentMovie = session.movie;
         state.selectedFiles = session.files;
 
-        // Detect MP3 audio file for this movie
-        const allFiles = await api.getFiles(state.currentMovie);
-        state.audioFile = allFiles.find(f => f.endsWith('.mp3')) || null;
-        state.chapters = await api.getChapters(state.currentMovie);
+        try {
+            // Detect MP3 audio file for this movie
+            const allFiles = await api.getFiles(state.currentMovie);
+            state.audioFile = allFiles.find(f => f.endsWith('.mp3')) || null;
+            state.chapters = await api.getChapters(state.currentMovie);
 
-        state.subtitles.primary = await api.getSubtitles(
-            state.currentMovie,
-            state.selectedFiles[0]
-        );
-        state.subtitles.secondary =
-            state.selectedFiles.length > 1
-                ? await api.getSubtitles(state.currentMovie, state.selectedFiles[1])
-                : [];
+            state.subtitles.primary = await api.getSubtitles(
+                state.currentMovie,
+                state.selectedFiles[0]
+            );
+            state.subtitles.secondary =
+                state.selectedFiles.length > 1
+                    ? await api.getSubtitles(state.currentMovie, state.selectedFiles[1])
+                    : [];
+        } catch {
+            alert("이어서 불러오지 못했습니다. 네트워크를 확인하고 다시 시도하세요.");
+            return null;
+        }
         return session;
     }
 
@@ -531,14 +536,19 @@
         stopPlaylist(false);
         cancelLoop();
         state.mode = "reader";
-        state.subtitles.primary = await api.getSubtitles(
-            state.currentMovie,
-            state.selectedFiles[0]
-        );
-        state.subtitles.secondary =
-            state.selectedFiles.length > 1
-                ? await api.getSubtitles(state.currentMovie, state.selectedFiles[1])
-                : [];
+        try {
+            state.subtitles.primary = await api.getSubtitles(
+                state.currentMovie,
+                state.selectedFiles[0]
+            );
+            state.subtitles.secondary =
+                state.selectedFiles.length > 1
+                    ? await api.getSubtitles(state.currentMovie, state.selectedFiles[1])
+                    : [];
+        } catch {
+            alert("자막을 불러오지 못했습니다. 네트워크를 확인하고 다시 시도하세요.");
+            return;
+        }
         state.position = 0;
         state.positionSecondary = 0;
         const selectedChapter = state.chapters[state.selectedChapterIndex];
