@@ -102,6 +102,17 @@
     const $ = (sel) => document.querySelector(sel);
     const $$ = (sel) => document.querySelectorAll(sel);
 
+    // 자막 파일(업로드/외부 다운로드) 내용은 신뢰할 수 없는 입력이므로 innerHTML에
+    // 넣기 전 반드시 이스케이프한다 — <script>/<img onerror> 같은 태그가 그대로
+    // 실행되는 XSS를 막기 위함. 단, <i>/<b>/<u>는 자막에서 흔히 쓰이는 안전한
+    // 서식 태그라 이스케이프 후 정확히 이 형태로만 되돌려 살려준다(속성 없는
+    // 태그만 허용하므로 <img onerror=...> 같은 위험한 값은 되돌아가지 않음).
+    const escapeHtml = (str) => str.replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+    const SAFE_TAG_RE = /&lt;(\/?(?:i|b|u))&gt;/gi;
+    const sanitizeSubtitleHtml = (str) => escapeHtml(str).replace(SAFE_TAG_RE, "<$1>");
+
     const views = {
         movies: $("#view-movies"),
         files: $("#view-files"),
@@ -593,11 +604,11 @@
         const secondary = getVisibleEntries(state.subtitles.secondary, state.positionSecondary);
 
         $("#card-primary").innerHTML = primary
-            .map((e) => `<div>${e.text.replace(/\n/g, "<br>")}</div>`)
+            .map((e) => `<div>${sanitizeSubtitleHtml(e.text).replace(/\n/g, "<br>")}</div>`)
             .join("");
 
         $("#card-secondary").innerHTML = secondary
-            .map((e) => `<div>${e.text.replace(/\n/g, "<br>")}</div>`)
+            .map((e) => `<div>${sanitizeSubtitleHtml(e.text).replace(/\n/g, "<br>")}</div>`)
             .join("");
 
         const total = state.subtitles.primary.length;
@@ -1212,13 +1223,13 @@
 
             const timeStr = entry.start.split(",")[0];
             let html = `<div class="loop-card-time">${tagHTML}#${i + 1} · ${timeStr}</div>`;
-            html += `<div class="loop-card-text">${entry.text.replace(/\n/g, " ")}</div>`;
+            html += `<div class="loop-card-text">${sanitizeSubtitleHtml(entry.text).replace(/\n/g, " ")}</div>`;
 
             // Secondary subtitle if available
             if (secSubs.length > 0) {
                 const secIdx = findSubtitleAtTime(secSubs, timeToSeconds(entry.start));
                 if (secIdx >= 0) {
-                    html += `<div class="loop-card-secondary">${secSubs[secIdx].text.replace(/\n/g, " ")}</div>`;
+                    html += `<div class="loop-card-secondary">${sanitizeSubtitleHtml(secSubs[secIdx].text).replace(/\n/g, " ")}</div>`;
                 }
             }
 
@@ -1848,11 +1859,11 @@
             }
             html += `<button type="button" class="review-done-btn${rec && rec.d ? " active" : ""}">✓</button>`;
             html += "</div>";
-            html += `<div class="loop-card-text">${entry.text.replace(/\n/g, " ")}</div>`;
+            html += `<div class="loop-card-text">${sanitizeSubtitleHtml(entry.text).replace(/\n/g, " ")}</div>`;
             if (secSubs.length > 0) {
                 const secIdx = findSubtitleAtTime(secSubs, timeToSeconds(entry.start));
                 if (secIdx >= 0) {
-                    html += `<div class="loop-card-secondary">${secSubs[secIdx].text.replace(/\n/g, " ")}</div>`;
+                    html += `<div class="loop-card-secondary">${sanitizeSubtitleHtml(secSubs[secIdx].text).replace(/\n/g, " ")}</div>`;
                 }
             }
             card.innerHTML = html;
