@@ -338,15 +338,15 @@
             const s = study.summary;
             const remainMin = Math.max(1, Math.round(s.remainSec / 60));
             commuteDesc.textContent =
-                `${session.movie} · 세션 ${s.currentSession}/${s.sessionCount} · 남은 ${remainMin}분`;
+                `세션 ${s.currentSession}/${s.sessionCount} · 남은 ${remainMin}분 · ${session.movie}`;
         } else {
-            commuteDesc.textContent = `${session.movie} · 처음부터`;
+            commuteDesc.textContent = `처음부터 · ${session.movie}`;
         }
 
         const marked = countMarkedCues(study);
         if (marked > 0) {
             reviewCard.classList.remove("disabled");
-            reviewDesc.textContent = `${session.movie} · 다시들은 문장 ${marked}개`;
+            reviewDesc.textContent = `다시들은 문장 ${marked}개 · ${session.movie}`;
         } else {
             reviewCard.classList.add("disabled");
             reviewDesc.textContent = "마킹된 문장이 없습니다";

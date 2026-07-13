@@ -277,7 +277,7 @@ header h1 {
 
 .btn-icon.btn-home {
     font-size: 26px;
-    padding: 6px 10px;
+    padding: 8px 12px;
 }
 
 :focus-visible {
@@ -941,11 +941,22 @@ header h1 {
 
 .commute-rate-row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
+    padding-top: 4px;
 }
 .commute-rate-row .rate-group { justify-content: center; }
 #commute-subtitle-row.hidden { display: none; }
+
+/* 라이딩 중 조작하는 버튼은 44px 이상 터치 영역 확보 (장갑/흔들림 대응) */
+.commute-stage .btn-option {
+    min-height: 44px;
+    padding-left: 14px;
+    padding-right: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
 
 .commute-hint {
     font-size: 12px;
