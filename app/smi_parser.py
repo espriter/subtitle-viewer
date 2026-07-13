@@ -6,6 +6,7 @@ _SYNC_PATTERN = re.compile(
     r"<SYNC\s+Start\s*=\s*(\d+)\s*>",
     re.IGNORECASE,
 )
+_BR_PATTERN = re.compile(r"<br\s*/?>", re.IGNORECASE)
 _TAG_PATTERN = re.compile(r"<[^>]+>")
 _NBSP_PATTERN = re.compile(r"&nbsp;?", re.IGNORECASE)
 
@@ -23,6 +24,7 @@ def _ms_to_timecode(ms: int) -> str:
 def _clean_text(raw: str) -> str:
     """Strip HTML tags and collapse whitespace from SMI body text."""
     text = _NBSP_PATTERN.sub(" ", raw)
+    text = _BR_PATTERN.sub("\n", text)  # <br> 태그는 줄바꿈으로 보존한 뒤 나머지 태그 제거
     text = _TAG_PATTERN.sub("", text)
     text = unescape(text)
     text = re.sub(r"[ \t]+", " ", text)
