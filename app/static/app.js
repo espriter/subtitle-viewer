@@ -355,8 +355,19 @@
 
     // --- View 1: Movies ---
     async function loadMovies() {
-        state.movies = await api.getMovies();
         const list = $("#movie-list");
+        try {
+            state.movies = await api.getMovies();
+        } catch {
+            // 네트워크 끊김(예: 라이딩 중 전파 약한 구간)에도 앱이 멈추지 않도록 재시도 가능한 상태로 표시
+            list.innerHTML = "";
+            const err = document.createElement("div");
+            err.className = "card-item";
+            err.textContent = "목록을 불러오지 못했습니다 · 탭하여 재시도";
+            err.addEventListener("click", () => loadMovies());
+            list.appendChild(err);
+            return;
+        }
         list.innerHTML = "";
         state.movies.forEach((movie) => {
             const el = document.createElement("div");
@@ -411,8 +422,13 @@
         stopPlaylist(false);
         cancelLoop();
         $("#movie-title").textContent = movie;
-        state.files = await api.getFiles(movie);
-        state.chapters = await api.getChapters(movie);
+        try {
+            state.files = await api.getFiles(movie);
+            state.chapters = await api.getChapters(movie);
+        } catch {
+            alert("폴더 정보를 불러오지 못했습니다. 네트워크를 확인하고 다시 시도하세요.");
+            return;
+        }
         state.audioFile = state.files.find(f => f.endsWith('.mp3')) || null;
         state.files = state.files.filter(f => f.endsWith('.srt') || f.endsWith('.smi'));
         renderChapterList();
