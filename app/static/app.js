@@ -410,12 +410,16 @@
         const name = prompt("새 폴더 이름을 입력하세요 (영문, 숫자, 하이픈, 언더스코어만 가능):");
         if (!name) return;
 
-        const resp = await api.createMovie(name.trim());
-        if (resp.ok) {
-            await loadMovies();
-        } else {
-            const err = await resp.json();
-            alert(err.detail || "폴더 생성 실패");
+        try {
+            const resp = await api.createMovie(name.trim());
+            if (resp.ok) {
+                await loadMovies();
+            } else {
+                const err = await resp.json();
+                alert(err.detail || "폴더 생성 실패");
+            }
+        } catch {
+            alert("폴더 생성 실패. 네트워크를 확인하고 다시 시도하세요.");
         }
     }
 
@@ -1004,13 +1008,17 @@
         const file = fileInput.files[0];
         if (!file) return;
 
-        const resp = await api.uploadFile(state.currentMovie, file);
-        if (resp.ok) {
-            state.files = await api.getFiles(state.currentMovie);
-            renderFileList();
-        } else {
-            const err = await resp.json();
-            alert(err.detail || "업로드 실패");
+        try {
+            const resp = await api.uploadFile(state.currentMovie, file);
+            if (resp.ok) {
+                state.files = await api.getFiles(state.currentMovie);
+                renderFileList();
+            } else {
+                const err = await resp.json();
+                alert(err.detail || "업로드 실패");
+            }
+        } catch {
+            alert("업로드 실패. 네트워크를 확인하고 다시 시도하세요.");
         }
         fileInput.value = "";
     }
