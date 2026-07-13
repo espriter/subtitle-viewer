@@ -47,6 +47,16 @@ def create_app(
             response.headers["Cache-Control"] = "no-cache"
         return response
 
+    @app.middleware("http")
+    async def security_headers(request: Request, call_next):
+        # CSP는 index.html의 인라인 style 속성 때문에 정책 설계가 더 필요해 보류.
+        # 호환성 리스크 없는 기본 방어 헤더만 우선 추가.
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
     @app.get("/api/movies")
     def list_movies():
         if not subs_dir.exists():
