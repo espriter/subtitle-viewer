@@ -111,6 +111,15 @@ body {
     max-width: 30ch;
 }
 
+/* 거치대에 가로로 꽂아둔 폰 대응: 히어로 영역을 압축해 액션 카드가 스크롤 없이 보이게 함 */
+@media (orientation: landscape) and (max-height: 500px) {
+    #home-screen { padding-top: 20px; padding-bottom: 20px; }
+    .home-hero { flex: 0 0 auto; padding: 0 0 16px; }
+    .home-kicker { margin-bottom: 6px; }
+    .home-title { font-size: 26px; margin-bottom: 0; }
+    .home-subtitle { display: none; }
+}
+
 /* Home Menu Cards */
 .home-menu {
     display: flex;

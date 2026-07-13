@@ -37,6 +37,16 @@ def create_app(
             return JSONResponse(status_code=400, content={"detail": "Path traversal not allowed"})
         return await call_next(request)
 
+    @app.middleware("http")
+    async def no_cache_static(request: Request, call_next):
+        # 정적 파일(app.js/style.css 등)은 빌드/해시가 없어 배포 즉시 반영되어야 함.
+        # Cache-Control이 없으면 Cloudflare가 자체 기본 TTL(수 시간)로 엣지 캐싱해
+        # 배포 후에도 오래된 버전이 보일 수 있어, ETag 재검증을 강제한다.
+        response = await call_next(request)
+        if not request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
     @app.get("/api/movies")
     def list_movies():
         if not subs_dir.exists():
