@@ -24,7 +24,10 @@ def create_upload_router(subtitles_dir: Path) -> APIRouter:
     @router.post("/api/movies", status_code=201)
     def create_movie(req: CreateMovieRequest):
         if not _SAFE_NAME.match(req.name):
-            raise HTTPException(status_code=400, detail=f"Invalid name: {req.name}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"영문, 숫자, 하이픈, 언더스코어만 사용할 수 있습니다: {req.name}",
+            )
         movie_dir = subtitles_dir / req.name
         if movie_dir.exists():
             raise HTTPException(status_code=409, detail="Movie folder already exists")
