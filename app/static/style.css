@@ -974,6 +974,23 @@ header h1 {
     line-height: 1.5;
 }
 
+/* 라이딩 중 실제로 조작하는 화면: 재생/배속/자막 칩까지 스크롤 없이 보이도록 압축 */
+@media (orientation: landscape) and (max-height: 500px) {
+    .commute-sessions { margin-bottom: 4px; }
+    .session-chip { padding: 6px 10px; }
+    .commute-stage {
+        justify-content: flex-start;
+        gap: 4px;
+        padding-top: 0;
+        padding-bottom: 4px;
+    }
+    .commute-summary { font-size: 11px; }
+    .commute-play { width: 56px; height: 56px; font-size: 22px; }
+    .commute-now { min-height: 0; font-size: 14px; }
+    .commute-sub-actions { display: none; }
+    .commute-hint { display: none; }
+}
+
 /* ===== Review View (리뷰 모드) ===== */
 .review-session-nav {
     display: flex;
