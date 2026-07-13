@@ -116,7 +116,7 @@
             <span id="position-indicator">1 / 1</span>
             <div class="reader-header-actions">
                 <button id="btn-settings" class="btn-icon">&#9881;</button>
-                <button id="btn-home" class="btn-icon" title="홈으로">&#8962;</button>
+                <button id="btn-home" class="btn-icon btn-home" title="홈으로">&#8962;</button>
             </div>
         </header>
 
@@ -241,6 +241,7 @@
         <div class="loop-sticky-header">
             <header>
                 <button id="btn-loop-back" class="btn-icon">&larr;</button>
+                <button id="btn-loop-home" class="btn-icon btn-home" title="홈으로">&#8962;</button>
                 <h1>구간반복 설정</h1>
                 <button id="btn-loop-save" class="btn btn-loop-save" disabled>저장</button>
             </header>
@@ -276,6 +277,7 @@
     <div id="view-commute" class="view">
         <header>
             <button id="btn-commute-back" class="btn-icon">&larr;</button>
+            <button id="btn-commute-home" class="btn-icon btn-home" title="홈으로">&#8962;</button>
             <h1>라이딩 모드</h1>
             <button id="btn-commute-open-review" class="btn-icon" title="리뷰">&#128221;</button>
         </header>
@@ -290,6 +292,13 @@
             <div class="commute-sub-actions">
                 <button id="btn-commute-restart" class="btn-option">세션 처음부터</button>
                 <button id="btn-commute-playlist" class="btn-option hidden">🔁 복습 재생</button>
+            </div>
+            <div class="commute-rate-row" id="commute-subtitle-row">
+                <span class="loop-option-label">자막</span>
+                <span class="btn-group">
+                    <button class="btn-option" data-commute-subtitle="primary">1st</button>
+                    <button class="btn-option" data-commute-subtitle="secondary">2nd</button>
+                </span>
             </div>
             <div class="commute-rate-row">
                 <span class="loop-option-label">배속</span>
@@ -311,6 +320,7 @@
         <div class="loop-sticky-header">
             <header>
                 <button id="btn-review-back" class="btn-icon">&larr;</button>
+                <button id="btn-review-home" class="btn-icon btn-home" title="홈으로">&#8962;</button>
                 <h1>리뷰</h1>
                 <button id="btn-review-blind" class="btn-option" title="자막 가리고 듣기">블라인드</button>
             </header>

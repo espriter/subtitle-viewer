@@ -275,6 +275,11 @@ header h1 {
 
 .btn-icon:hover { color: var(--accent); }
 
+.btn-icon.btn-home {
+    font-size: 26px;
+    padding: 6px 10px;
+}
+
 :focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
@@ -940,6 +945,7 @@ header h1 {
     gap: 8px;
 }
 .commute-rate-row .rate-group { justify-content: center; }
+#commute-subtitle-row.hidden { display: none; }
 
 .commute-hint {
     font-size: 12px;

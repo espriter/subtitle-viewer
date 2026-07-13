@@ -24,6 +24,7 @@
             commuteTargetMin: 15,     // 가상 세션 목표 길이(분)
             sessionEndPause: true,    // 세션 경계 도달 시 일시정지
             commuteSwapButtons: false, // 이어폰 prev/next 의미 스왑 (AirPods 대응)
+            commuteSubtitle: "primary", // 라이딩 미리보기 자막: "primary"(1st) | "secondary"(2nd)
         },
         uploadEnabled: true,
         audioFile: null,
@@ -954,6 +955,16 @@
             swapBtn.textContent = state.settings.commuteSwapButtons ? "ON" : "OFF";
             swapBtn.classList.toggle("active", state.settings.commuteSwapButtons);
         }
+        const subtitleRow = $("#commute-subtitle-row");
+        if (subtitleRow) {
+            subtitleRow.classList.toggle("hidden", state.subtitles.secondary.length === 0);
+        }
+        $$("[data-commute-subtitle]").forEach((btn) => {
+            btn.classList.toggle(
+                "active",
+                btn.dataset.commuteSubtitle === (state.settings.commuteSubtitle || "primary")
+            );
+        });
     }
 
     // --- Upload ---
@@ -1410,10 +1421,23 @@
         if (state.study.sessions.length === 0) computeStudySessions();
         state.study.currentIndex = sessionIndexForSec(state.study.data.resumeSec || 0);
         updateMediaSession();
+        applySettings();
         renderCommuteSessions();
         updateCommuteSummary();
         updateCommutePlayButton();
         showView("commute");
+    }
+
+    // 어느 화면(구간반복/라이딩/리뷰)에서든 한 번에 홈으로. 진행 중이던 라이딩/루프 상태를
+    // 안전하게 정리(둘 다 관련 없으면 no-op)한 뒤 홈 화면으로 이동.
+    function goHome() {
+        saveStudy(true);
+        cancelLoop();
+        state.mode = "reader";
+        updateMediaSession();
+        showView("movies");
+        showHomeScreen();
+        loadMovies();
     }
 
     function exitCommute() {
@@ -1542,10 +1566,11 @@
     function updateCommuteNow(t) {
         const el = $("#commute-now");
         if (!el) return;
-        const idx = findSubtitleAtTime(state.subtitles.primary, t);
-        el.textContent = idx >= 0
-            ? state.subtitles.primary[idx].text.replace(/\n/g, " ")
-            : "";
+        const list = state.settings.commuteSubtitle === "secondary" && state.subtitles.secondary.length > 0
+            ? state.subtitles.secondary
+            : state.subtitles.primary;
+        const idx = findSubtitleAtTime(list, t);
+        el.textContent = idx >= 0 ? list[idx].text.replace(/\n/g, " ") : "";
     }
 
     function completeCommuteSession(sess) {
@@ -1904,11 +1929,7 @@
             showView("files");
         });
 
-        $("#btn-home").addEventListener("click", () => {
-            showView("movies");
-            showHomeScreen();
-            loadMovies();
-        });
+        $("#btn-home").addEventListener("click", goHome);
 
         $("#btn-start").addEventListener("click", startReader);
         $("#btn-prev").addEventListener("click", () => navigate(-1));
@@ -1990,6 +2011,7 @@
         // Loop
         $("#btn-loop").addEventListener("click", () => showLoopSetup(false));
         $("#btn-loop-back").addEventListener("click", () => showView("reader"));
+        $("#btn-loop-home").addEventListener("click", goHome);
         $("#btn-loop-save").addEventListener("click", saveLoop);
         $("#btn-loop-cancel").addEventListener("click", cancelLoop);
         $("#btn-loop-replay").addEventListener("click", replayLoop);
@@ -2018,6 +2040,16 @@
                 applyPlaybackRate();
                 saveSettings();
                 updatePositionState();
+            });
+        });
+
+        // Commute: 라이딩 미리보기 자막 선택 (1st/2nd)
+        $$("[data-commute-subtitle]").forEach((b) => {
+            b.addEventListener("click", () => {
+                state.settings.commuteSubtitle = b.dataset.commuteSubtitle;
+                saveSettings();
+                applySettings();
+                updateCommuteNow($("#audio-player").currentTime);
             });
         });
 
@@ -2059,6 +2091,7 @@
             enterCommute();
         });
         $("#btn-commute-back").addEventListener("click", exitCommute);
+        $("#btn-commute-home").addEventListener("click", goHome);
         $("#btn-commute-open-review").addEventListener("click", () => {
             state.review.from = "commute";
             enterReview(state.study.currentIndex);
@@ -2073,6 +2106,7 @@
 
         // Review view
         $("#btn-review-back").addEventListener("click", exitReview);
+        $("#btn-review-home").addEventListener("click", goHome);
         $("#btn-review-prev-session").addEventListener("click", () => navReviewSession(-1));
         $("#btn-review-next-session").addEventListener("click", () => navReviewSession(1));
         $("#btn-review-filter-marked").addEventListener("click", () => {
