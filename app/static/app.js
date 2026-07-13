@@ -845,6 +845,12 @@
         console.warn("Audio load failed, falling back to manual mode");
         $("#audio-container").classList.add("hidden");
         state.audioFile = null;
+        const banner = $("#audio-error-banner");
+        if (banner) {
+            banner.classList.remove("hidden");
+            clearTimeout(banner._hideTimer);
+            banner._hideTimer = setTimeout(() => banner.classList.add("hidden"), 5000);
+        }
     }
 
     function updateMediaSession() {

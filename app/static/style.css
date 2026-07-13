@@ -646,6 +646,18 @@ header h1 {
 }
 .time-jump-feedback.hidden { display: none; }
 
+.audio-error-banner {
+    background: rgba(251,113,133,0.14);
+    border: 1px solid rgba(251,113,133,0.35);
+    color: var(--loop-b);
+    font-size: 13px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    text-align: center;
+}
+.audio-error-banner.hidden { display: none; }
+
 /* ===== Loop Setup View ===== */
 #view-loop.active,
 #view-review.active {
