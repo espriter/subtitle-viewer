@@ -1601,6 +1601,7 @@
         const audio = $("#audio-player");
         const playing = !audio.paused;
         btn.innerHTML = playing ? "&#10074;&#10074;" : "&#9654;";
+        btn.setAttribute("aria-label", playing ? "일시정지" : "재생");
         btn.classList.toggle("playing", playing);
     }
 
