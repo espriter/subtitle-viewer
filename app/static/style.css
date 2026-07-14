@@ -584,7 +584,7 @@ header h1 {
 }
 .setting-row:last-of-type { border-bottom: none; }
 
-.setting-row label { font-size: 14px; color: var(--text-muted); }
+.setting-row label { font-size: 14px; color: var(--text-muted); flex-shrink: 0; white-space: nowrap; }
 
 .btn-group { display: flex; gap: 6px; align-items: center; }
 
