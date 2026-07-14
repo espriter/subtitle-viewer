@@ -684,13 +684,18 @@
         if (!subs || subs.length === 0) return;
 
         const targetSeconds = timeToSeconds(input);
+        const feedback = $("#time-jump-feedback");
+        if (isNaN(targetSeconds)) {
+            feedback.textContent = "올바른 시간 형식이 아닙니다 (예: 00:30:00)";
+            feedback.classList.remove("hidden");
+            return;
+        }
         const idx = findNearestSubtitle(subs, targetSeconds);
 
         state.position = idx;
         renderSubtitles();
 
         const entry = subs[idx];
-        const feedback = $("#time-jump-feedback");
         feedback.textContent = `→ ${entry.start.split(",")[0]} (#${idx + 1}) 로 이동`;
         feedback.classList.remove("hidden");
     }
