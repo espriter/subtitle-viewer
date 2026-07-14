@@ -22,7 +22,7 @@
 </head>
 <body>
     <!-- View 1: Home Screen -->
-    <div id="view-movies" class="view active">
+    <div id="view-movies" class="view active" role="main">
         <div id="home-screen">
             <div class="home-hero">
                 <div class="home-kicker">SUBTITLE READER</div>
@@ -87,7 +87,7 @@
     </div>
 
     <!-- View 2: File Selection -->
-    <div id="view-files" class="view">
+    <div id="view-files" class="view" role="main">
         <header>
             <button id="btn-back-movies" class="btn-icon" aria-label="뒤로">&larr;</button>
             <h1 id="movie-title"></h1>
@@ -111,7 +111,7 @@
     </div>
 
     <!-- View 3: Subtitle Viewer -->
-    <div id="view-reader" class="view">
+    <div id="view-reader" class="view" role="main">
         <header class="reader-header">
             <button id="btn-back-files" class="btn-icon" aria-label="뒤로">&larr;</button>
             <span id="position-indicator">1 / 1</span>
@@ -241,7 +241,7 @@
     </div>
 
     <!-- View 4: Loop Setup -->
-    <div id="view-loop" class="view">
+    <div id="view-loop" class="view" role="main">
         <div class="loop-sticky-header">
             <header>
                 <button id="btn-loop-back" class="btn-icon" aria-label="뒤로">&larr;</button>
@@ -278,7 +278,7 @@
     </div>
 
     <!-- View 5: Commute (라이딩 모드) -->
-    <div id="view-commute" class="view">
+    <div id="view-commute" class="view" role="main">
         <header>
             <button id="btn-commute-back" class="btn-icon" aria-label="뒤로">&larr;</button>
             <button id="btn-commute-home" class="btn-icon btn-home" title="홈으로" aria-label="홈으로">&#8962;</button>
@@ -320,7 +320,7 @@
     </div>
 
     <!-- View 6: Review (리뷰 모드) -->
-    <div id="view-review" class="view">
+    <div id="view-review" class="view" role="main">
         <div class="loop-sticky-header">
             <header>
                 <button id="btn-review-back" class="btn-icon" aria-label="뒤로">&larr;</button>
