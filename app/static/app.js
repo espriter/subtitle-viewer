@@ -380,6 +380,8 @@
             list.innerHTML = "";
             const err = document.createElement("div");
             err.className = "card-item";
+            err.setAttribute("role", "button");
+            err.tabIndex = 0;
             err.textContent = "목록을 불러오지 못했습니다 · 탭하여 재시도";
             err.addEventListener("click", () => loadMovies());
             list.appendChild(err);
@@ -389,6 +391,8 @@
         state.movies.forEach((movie) => {
             const el = document.createElement("div");
             el.className = "card-item";
+            el.setAttribute("role", "button");
+            el.tabIndex = 0;
             el.textContent = movie;
             el.addEventListener("click", () => selectMovie(movie));
             list.appendChild(el);
@@ -465,6 +469,8 @@
         state.files.forEach((file) => {
             const el = document.createElement("div");
             el.className = "card-item";
+            el.setAttribute("role", "button");
+            el.tabIndex = 0;
             const order = state.selectedFiles.indexOf(file);
             if (order >= 0) {
                 el.classList.add("selected");
@@ -1169,6 +1175,14 @@
             if (!views.reader.classList.contains("active")) return;
             if (e.key === "ArrowLeft") navigate(-1);
             if (e.key === "ArrowRight") navigate(1);
+        });
+
+        // role="button"인 클릭 전용 div(홈 메뉴 카드, 영화/파일 목록)를 키보드로도 조작 가능하게.
+        document.addEventListener("keydown", (e) => {
+            if (e.key !== "Enter" && e.key !== " ") return;
+            if (e.target.getAttribute("role") !== "button" || e.target.tagName === "BUTTON") return;
+            e.preventDefault();
+            e.target.click();
         });
     }
 
