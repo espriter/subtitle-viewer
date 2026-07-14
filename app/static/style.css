@@ -276,6 +276,11 @@ header h1 {
     font-size: 22px;
     cursor: pointer;
     padding: 4px 8px;
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 8px;
     transition: color 0.15s, background 0.15s;
 }
