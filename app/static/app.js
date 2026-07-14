@@ -37,6 +37,7 @@
             _finished: false, // loopCount 도달로 종료됨
             _waiting: false,  // 끝 멈춤(gap) 대기 중
             _gapTimer: null,
+            _sessionRepeat: false, // A-B가 수동 선택이 아닌 세션 반복 토글로 설정됨
         },
         mode: "reader",  // "reader" | "commute" | "review" — 재생 모드 (Media Session 매핑 분기)
         commuteFrom: "home", // 라이딩 모드 진입 경로 ("home" | "reader")
@@ -699,6 +700,8 @@
             audio.load();
             const btnLoop = $("#btn-loop");
             if (btnLoop) btnLoop.classList.add("hidden");
+            const btnSessionRepeat = $("#btn-session-repeat");
+            if (btnSessionRepeat) btnSessionRepeat.classList.add("hidden");
             const btnCommute = $("#btn-commute");
             if (btnCommute) btnCommute.classList.add("hidden");
             return;
@@ -734,6 +737,8 @@
 
         const btnLoop = $("#btn-loop");
         if (btnLoop) btnLoop.classList.remove("hidden");
+        const btnSessionRepeat = $("#btn-session-repeat");
+        if (btnSessionRepeat) btnSessionRepeat.classList.remove("hidden");
         const btnCommute = $("#btn-commute");
         if (btnCommute) btnCommute.classList.remove("hidden");
     }
@@ -1394,6 +1399,7 @@
         state.loop._done = 0;
         state.loop._finished = false;
         state.loop._waiting = false;
+        state.loop._sessionRepeat = false;
 
         // Return to reader, show indicator, seek to A and play.
         showView("reader");
@@ -1410,7 +1416,7 @@
         const endTime = subs[loop.endIndex].end.split(",")[0];
         const count = state.settings.loopCount;
 
-        let label = `${startTime} ~ ${endTime}`;
+        let label = loop._sessionRepeat ? `세션 반복 · ${startTime} ~ ${endTime}` : `${startTime} ~ ${endTime}`;
         if (loop._finished) {
             label = `✓ ${count}회 완료 · ${label}`;
         } else if (loop._waiting) {
@@ -1436,7 +1442,29 @@
         state.loop._done = 0;
         state.loop._finished = false;
         state.loop._waiting = false;
+        state.loop._sessionRepeat = false;
         $("#loop-indicator").classList.add("hidden");
+    }
+
+    // 현재 재생 위치가 속한 세션(segmenter.js, 라이딩 모드와 동일 계산)을 A-B 루프 범위로
+    // 설정한다 — Loop Setup에서 자막 2개를 직접 고르는 대신 한 번의 탭으로 세션 전체 반복.
+    function toggleSessionRepeat() {
+        if (state.loop.active && state.loop._sessionRepeat) {
+            cancelLoop();
+            return;
+        }
+        if (!state.audioFile || state.subtitles.primary.length === 0) return;
+        ensureStudy();
+        if (state.study.sessions.length === 0) computeStudySessions();
+        if (state.study.sessions.length === 0) return;
+        const audio = $("#audio-player");
+        const t = audio.currentTime + state.settings.syncOffset;
+        const sess = state.study.sessions[sessionIndexForSec(t)];
+        state.loop.startIndex = sess.startCue;
+        state.loop.endIndex = sess.endCue;
+        saveLoop();
+        state.loop._sessionRepeat = true;
+        updateLoopIndicator();
     }
 
     // ============================================================
@@ -2065,6 +2093,7 @@
         $("#btn-loop-home").addEventListener("click", goHome);
         $("#btn-loop-save").addEventListener("click", saveLoop);
         $("#btn-loop-cancel").addEventListener("click", cancelLoop);
+        $("#btn-session-repeat").addEventListener("click", toggleSessionRepeat);
         $("#btn-loop-replay").addEventListener("click", replayLoop);
         $("#loop-indicator-main").addEventListener("click", () => showLoopSetup(true));
 
