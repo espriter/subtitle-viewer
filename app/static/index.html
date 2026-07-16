@@ -30,23 +30,7 @@
                 <p class="home-subtitle">크게 읽고, 두 언어를 비교하고, 구간을 반복하세요</p>
             </div>
             <div class="home-menu">
-                <div class="menu-card feature" id="menu-movie-list" role="button" tabindex="0">
-                    <span class="menu-icon">📂</span>
-                    <div class="menu-text">
-                        <div class="menu-title">영화 목록</div>
-                        <div class="menu-desc">자막 폴더를 선택하세요</div>
-                    </div>
-                    <span class="menu-arrow">›</span>
-                </div>
-                <div class="menu-card" id="menu-resume" role="button" tabindex="0">
-                    <span class="menu-icon">▶</span>
-                    <div class="menu-text">
-                        <div class="menu-title">이어보기</div>
-                        <div class="menu-desc" id="resume-desc">마지막 위치부터 계속</div>
-                    </div>
-                    <span class="menu-arrow">›</span>
-                </div>
-                <div class="menu-card" id="menu-commute" role="button" tabindex="0">
+                <div class="menu-card feature" id="menu-commute" role="button" tabindex="0">
                     <span class="menu-icon">🚴</span>
                     <div class="menu-text">
                         <div class="menu-title">라이딩 모드</div>
@@ -54,7 +38,26 @@
                     </div>
                     <span class="menu-arrow">›</span>
                 </div>
-                <div class="menu-card" id="menu-review" role="button" tabindex="0">
+            </div>
+            <div class="section-label">더보기</div>
+            <div class="home-menu home-menu-secondary">
+                <div class="menu-card compact" id="menu-movie-list" role="button" tabindex="0">
+                    <span class="menu-icon">📂</span>
+                    <div class="menu-text">
+                        <div class="menu-title">영화 목록</div>
+                        <div class="menu-desc">자막 폴더를 선택하세요</div>
+                    </div>
+                    <span class="menu-arrow">›</span>
+                </div>
+                <div class="menu-card compact" id="menu-resume" role="button" tabindex="0">
+                    <span class="menu-icon">▶</span>
+                    <div class="menu-text">
+                        <div class="menu-title">자막으로 이어읽기</div>
+                        <div class="menu-desc" id="resume-desc">마지막 위치부터 계속</div>
+                    </div>
+                    <span class="menu-arrow">›</span>
+                </div>
+                <div class="menu-card compact" id="menu-review" role="button" tabindex="0">
                     <span class="menu-icon">📝</span>
                     <div class="menu-text">
                         <div class="menu-title">리뷰</div>
@@ -62,7 +65,7 @@
                     </div>
                     <span class="menu-arrow">›</span>
                 </div>
-                <div class="menu-card" id="menu-create-folder" style="display:none" role="button" tabindex="0">
+                <div class="menu-card compact" id="menu-create-folder" style="display:none" role="button" tabindex="0">
                     <span class="menu-icon">＋</span>
                     <div class="menu-text">
                         <div class="menu-title">새 폴더 만들기</div>
@@ -218,12 +221,27 @@
             <div class="setting-row">
                 <label>세션 길이</label>
                 <div class="btn-group">
+                    <button class="btn-option" data-commute-min="5">5분</button>
                     <button class="btn-option" data-commute-min="10">10분</button>
                     <button class="btn-option" data-commute-min="15">15분</button>
-                    <button class="btn-option" data-commute-min="20">20분</button>
+                    <button id="btn-commute-min-custom" class="btn-option">직접입력</button>
                 </div>
             </div>
-            <!-- Commute: pause at session end -->
+            <div class="setting-row setting-row-sub hidden" id="commute-min-custom-row">
+                <label for="commute-min-input">분 단위 입력</label>
+                <div class="btn-group">
+                    <input type="number" id="commute-min-input" class="commute-min-input" min="2" max="60" step="1" aria-label="세션 길이(분) 직접입력">
+                    <span>분</span>
+                </div>
+            </div>
+            <!-- Commute: repeat current session instead of advancing -->
+            <div class="setting-row">
+                <label>세션 반복재생</label>
+                <div class="btn-group">
+                    <button id="btn-commute-repeat" class="btn-option active">ON</button>
+                </div>
+            </div>
+            <!-- Commute: pause at session end (반복재생 OFF일 때만 의미 있음) -->
             <div class="setting-row">
                 <label>세션 끝 일시정지</label>
                 <div class="btn-group">

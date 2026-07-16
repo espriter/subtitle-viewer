@@ -21,8 +21,9 @@
             loopCount: 0,   // 0 = 무한 반복, N = N회 후 정지
             loopGap: 0,     // 구간 끝(B)에서 멈췄다 되감기까지 초
             playbackRate: 1,
-            commuteTargetMin: 15,     // 가상 세션 목표 길이(분)
-            sessionEndPause: true,    // 세션 경계 도달 시 일시정지
+            commuteTargetMin: 5,      // 가상 세션 목표 길이(분) — 짧은 라이딩 시간 반복 청취 기준
+            commuteRepeat: true,      // 세션 끝에서 다음 세션으로 넘기지 않고 세션 시작부터 반복
+            sessionEndPause: true,    // 세션 경계 도달 시 일시정지 (commuteRepeat OFF일 때만 적용)
             commuteSwapButtons: false, // 이어폰 prev/next 의미 스왑 (AirPods 대응)
             commuteSubtitle: "primary", // 라이딩 미리보기 자막: "primary"(1st) | "secondary"(2nd)
         },
@@ -46,6 +47,7 @@
             data: null,      // localStorage 영속 레코드 (progressSec/resumeSec/cues)
             sessions: [],    // Segmenter.computeSessions 결과 (메모이즈)
             currentIndex: 0, // 현재 세션 포인터 (resumeSec에서 파생)
+            repeatCount: 0,  // 현재 세션 반복 횟수 (commuteRepeat 표시용, 영속 저장 안 함)
         },
         review: {
             sessionIndex: 0,
@@ -304,6 +306,21 @@
             targetSec: state.settings.commuteTargetMin * 60,
             chapterStarts,
         });
+    }
+
+    // 세션 길이(분) 변경 적용 — 프리셋 칩/직접입력 공용 경로
+    function applyCommuteTargetMin(min) {
+        state.settings.commuteTargetMin = min;
+        saveSettings();
+        applySettings();
+        if (state.study.data && state.subtitles.primary.length > 0) {
+            computeStudySessions();
+            state.study.currentIndex = sessionIndexForSec(state.study.data.resumeSec || 0);
+            if (views.commute.classList.contains("active")) {
+                renderCommuteSessions();
+                updateCommuteSummary();
+            }
+        }
     }
 
     function sessionIndexForSec(sec) {
@@ -1002,12 +1019,29 @@
                 parseFloat(btn.dataset.rate) === (state.settings.playbackRate || 1)
             );
         });
+        const presetMins = Array.from($$("[data-commute-min]"), (btn) => parseInt(btn.dataset.commuteMin));
+        const isPreset = presetMins.includes(state.settings.commuteTargetMin);
         $$("[data-commute-min]").forEach((btn) => {
             btn.classList.toggle(
                 "active",
                 parseInt(btn.dataset.commuteMin) === state.settings.commuteTargetMin
             );
         });
+        const customBtn = $("#btn-commute-min-custom");
+        const customRow = $("#commute-min-custom-row");
+        const customInput = $("#commute-min-input");
+        if (customBtn && customRow && customInput) {
+            customBtn.classList.toggle("active", !isPreset);
+            customRow.classList.toggle("hidden", isPreset);
+            if (document.activeElement !== customInput) {
+                customInput.value = state.settings.commuteTargetMin;
+            }
+        }
+        const repeatBtn = $("#btn-commute-repeat");
+        if (repeatBtn) {
+            repeatBtn.textContent = state.settings.commuteRepeat ? "ON" : "OFF";
+            repeatBtn.classList.toggle("active", state.settings.commuteRepeat);
+        }
         const pauseBtn = $("#btn-session-end-pause");
         if (pauseBtn) {
             pauseBtn.textContent = state.settings.sessionEndPause ? "ON" : "OFF";
@@ -1518,6 +1552,7 @@
         ensureStudy();
         if (state.study.sessions.length === 0) computeStudySessions();
         state.study.currentIndex = sessionIndexForSec(state.study.data.resumeSec || 0);
+        state.study.repeatCount = 0;
         updateMediaSession();
         applySettings();
         renderCommuteSessions();
@@ -1583,6 +1618,7 @@
     function selectCommuteSession(i) {
         stopPlaylist(false);
         state.study.currentIndex = i;
+        state.study.repeatCount = 0;
         renderCommuteSessions();
         updateCommuteSummary();
     }
@@ -1601,6 +1637,9 @@
         const resume = state.study.data ? state.study.data.resumeSec || 0 : 0;
         if (resume > sess.startSec + 1 && resume < sess.endSec - 1) {
             line += ` · 이어서 ${formatClock(resume)}`;
+        }
+        if (state.settings.commuteRepeat && state.study.repeatCount > 0) {
+            line += ` · 🔁 ${state.study.repeatCount + 1}회째`;
         }
         el.textContent = line;
 
@@ -1676,9 +1715,21 @@
         const audio = $("#audio-player");
         const st = state.study;
         st.data.progressSec = Math.max(st.data.progressSec || 0, sess.endSec);
+
+        if (state.settings.commuteRepeat) {
+            // 다음 세션으로 넘기지 않고 세션 시작으로 되감아 끊김없이 반복
+            st.repeatCount += 1;
+            st.data.resumeSec = sess.startSec;
+            audio.currentTime = Math.max(0, sess.startSec - state.settings.syncOffset);
+            saveStudy(true);
+            updateCommuteSummary();
+            return;
+        }
+
         const isLast = st.currentIndex >= st.sessions.length - 1;
         if (!isLast) {
             st.currentIndex += 1;
+            st.repeatCount = 0;
             st.data.resumeSec = st.sessions[st.currentIndex].startSec;
         }
         if (state.settings.sessionEndPause || isLast) {
@@ -2155,21 +2206,23 @@
 
         // Commute: session length — 변경 시 세션 재계산 (기록은 시간 기준이라 유효 유지)
         $$("[data-commute-min]").forEach((b) => {
-            b.addEventListener("click", () => {
-                state.settings.commuteTargetMin = parseInt(b.dataset.commuteMin);
-                saveSettings();
-                applySettings();
-                if (state.study.data && state.subtitles.primary.length > 0) {
-                    computeStudySessions();
-                    state.study.currentIndex = sessionIndexForSec(state.study.data.resumeSec || 0);
-                    if (views.commute.classList.contains("active")) {
-                        renderCommuteSessions();
-                        updateCommuteSummary();
-                    }
-                }
-            });
+            b.addEventListener("click", () => applyCommuteTargetMin(parseInt(b.dataset.commuteMin)));
+        });
+        $("#btn-commute-min-custom").addEventListener("click", () => {
+            $("#commute-min-custom-row").classList.remove("hidden");
+            $("#btn-commute-min-custom").classList.add("active");
+            $("#commute-min-input").focus();
+        });
+        $("#commute-min-input").addEventListener("change", (e) => {
+            const min = Math.min(60, Math.max(2, parseInt(e.target.value) || state.settings.commuteTargetMin));
+            applyCommuteTargetMin(min);
         });
 
+        $("#btn-commute-repeat").addEventListener("click", () => {
+            state.settings.commuteRepeat = !state.settings.commuteRepeat;
+            saveSettings();
+            applySettings();
+        });
         $("#btn-session-end-pause").addEventListener("click", () => {
             state.settings.sessionEndPause = !state.settings.sessionEndPause;
             saveSettings();
