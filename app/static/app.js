@@ -1647,6 +1647,7 @@
         if (plBtn) {
             const marked = markedCuesInOrder().length;
             plBtn.classList.toggle("hidden", marked === 0 && !state.playlist.active);
+            plBtn.classList.toggle("active", state.playlist.active);
             plBtn.textContent = state.playlist.active
                 ? "⏹ 복습 중지"
                 : `🔁 복습 재생 (${marked}문장)`;
