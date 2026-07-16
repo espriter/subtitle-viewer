@@ -2256,7 +2256,9 @@
             else audio.pause();
         });
         $("#btn-commute-restart").addEventListener("click", () => startCommutePlayback(true));
-        $("#btn-commute-playlist").addEventListener("click", toggleMarkedPlaylist);
+        // ponytail: 버튼은 라이딩 모드 화면에서 뺐음(세션 반복재생과 혼동됨) — 로직은 유지, 재도입 시 이 바인딩만 살리면 됨
+        const plBtn = $("#btn-commute-playlist");
+        if (plBtn) plBtn.addEventListener("click", toggleMarkedPlaylist);
 
         // Review view
         $("#btn-review-back").addEventListener("click", exitReview);
