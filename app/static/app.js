@@ -1619,6 +1619,15 @@
         stopPlaylist(false);
         state.study.currentIndex = i;
         state.study.repeatCount = 0;
+        // 세션 칩만 바꾸고 오디오를 그대로 두면 재생 중이던 이전 세션 자막이 계속
+        // 표시돼 "화면과 소리가 따로 논다"는 인상을 준다 — 탭 즉시 새 세션 시작으로 시크.
+        const sess = state.study.sessions[i];
+        if (sess) {
+            const audio = $("#audio-player");
+            audio.currentTime = Math.max(0, sess.startSec - state.settings.syncOffset);
+            if (state.study.data) state.study.data.resumeSec = sess.startSec;
+            updateCommuteNow(sess.startSec);
+        }
         renderCommuteSessions();
         updateCommuteSummary();
     }
