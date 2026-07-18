@@ -1779,6 +1779,19 @@
         audio.play().catch(() => {});
     }
 
+    // 화면 보고 있을 때 탭으로 바로 마킹 — replayCurrentSentence()와 동일 동작(이어폰 ⏮의 온스크린 버전)
+    function markCurrentSentenceOnScreen() {
+        replayCurrentSentence();
+        const btn = $("#btn-commute-mark");
+        if (!btn) return;
+        if (btn.dataset.label === undefined) btn.dataset.label = btn.textContent;
+        clearTimeout(btn._resetTimer);
+        btn.textContent = "✓ 마킹됨";
+        btn._resetTimer = setTimeout(() => {
+            btn.textContent = btn.dataset.label;
+        }, 900);
+    }
+
     // 이어폰 ⏭ — 다음 문장으로 스킵 (마킹 없음)
     function skipToNextSentence() {
         if (state.playlist.active) {
@@ -2265,6 +2278,7 @@
             else audio.pause();
         });
         $("#btn-commute-restart").addEventListener("click", () => startCommutePlayback(true));
+        $("#btn-commute-mark").addEventListener("click", markCurrentSentenceOnScreen);
         // ponytail: 버튼은 라이딩 모드 화면에서 뺐음(세션 반복재생과 혼동됨) — 로직은 유지, 재도입 시 이 바인딩만 살리면 됨
         const plBtn = $("#btn-commute-playlist");
         if (plBtn) plBtn.addEventListener("click", toggleMarkedPlaylist);

@@ -99,6 +99,20 @@
 있을 때 탭으로 바로 마킹할 수 있는 온스크린 버튼은 없음. 필요성이 확인되면 라이딩
 화면(또는 Reader)에 수동 마킹 버튼을 추가하는 방안을 검토할 것. 지금은 만들지 않음.
 
+## Addendum (2026-07-18): 수동 마킹 버튼 구현
+
+위 백로그를 구현. `view-commute`의 `.commute-sub-actions`에 `#btn-commute-mark`
+(`⏮ 다시듣기 (마킹)`) 버튼 추가 — 클릭 시 기존 `replayCurrentSentence()`를 그대로
+호출(이어폰 ⏮과 완전히 동일한 동작: 현재 문장 처음부터 재생 + `bumpReplayCount()`로
+암묵 마킹). 새 로직은 버튼 텍스트를 900ms간 "✓ 마킹됨"으로 바꿨다가 원복하는 시각
+피드백뿐(`markCurrentSentenceOnScreen()`). 세션반복 시 `commute-sub-actions`가
+가로모드 압축 화면에서는 기존과 동일하게 숨김(리소스 절약 규칙 그대로 적용, 라이딩
+중 실제 조작은 이어폰 우선이라는 기존 설계 의도 유지).
+
+Playwright로 실기 서버(8091) 대상 검증: 라이딩 화면 진입 → 재생 → 버튼 클릭 →
+`localStorage`의 `study.cues[idx].r` 증가 + 오디오가 문장 시작으로 되감김 + 버튼
+텍스트 일시 변경 확인.
+
 ## Manual Test Checklist
 
 1. 홈 화면 진입 시 라이딩 모드 카드가 최상단 큰 카드로 보이는가. 나머지는 "더보기"
