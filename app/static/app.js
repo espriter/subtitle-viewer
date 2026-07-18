@@ -2345,6 +2345,9 @@
         document.addEventListener("visibilitychange", () => {
             if (document.visibilityState === "visible" && views.reader.classList.contains("active")) {
                 requestWakeLock();
+            } else if (document.visibilityState === "hidden") {
+                // saveStudy()는 5초 스로틀이라 백그라운드 전환 직전 방금 한 마킹이 유실될 수 있음
+                saveStudy(true);
             }
         });
     }

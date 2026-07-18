@@ -174,6 +174,12 @@ Playwright로 검증: (a) 자동싱크 OFF + 오디오 정지 + 자막 10개 앞
 기존 마킹 보존 + 새 마킹 정상 기록, (c) 300ms 내 연속 탭 → 두 번째 탭은 무시되고
 마킹 횟수 1회만 기록.
 
+**추가 발견(리뷰 sweep)**: `saveStudy()`는 5초 스로틀이라, 마킹 직후 5초 안에 앱이
+백그라운드로 전환되면(화면 잠금, 탭 전환) 방금 한 마킹이 저장되지 않고 유실될 수
+있었음 — `visibilitychange`가 `hidden`이 될 때 `saveStudy(true)`로 즉시 강제 저장하도록
+추가. Playwright로 마킹 직후 50ms 내 `visibilitychange`를 발생시켜 `updatedAt`이
+갱신되고 마킹이 저장됨을 확인.
+
 ## Manual Test Checklist
 
 1. 홈 화면 진입 시 라이딩 모드 카드가 최상단 큰 카드로 보이는가. 나머지는 "더보기"
