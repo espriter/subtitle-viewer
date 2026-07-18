@@ -1713,11 +1713,16 @@
     function updateCommuteNow(t) {
         const el = $("#commute-now");
         if (!el) return;
-        const list = state.settings.commuteSubtitle === "secondary" && state.subtitles.secondary.length > 0
-            ? state.subtitles.secondary
-            : state.subtitles.primary;
+        const useSecondary = state.settings.commuteSubtitle === "secondary" && state.subtitles.secondary.length > 0;
+        const list = useSecondary ? state.subtitles.secondary : state.subtitles.primary;
         const idx = findSubtitleAtTime(list, t);
-        el.textContent = idx >= 0 ? list[idx].text.replace(/\n/g, " ") : "";
+        const text = idx >= 0 ? list[idx].text.replace(/\n/g, " ") : "";
+        // 마킹은 항상 primary 인덱스 기준이라, secondary 표시 중일 땐 별도로 구해야 함
+        // (secondary와 primary는 문장 수/타이밍이 달라 idx를 그대로 못 씀)
+        const primaryIdx = useSecondary ? findSubtitleAtTime(state.subtitles.primary, t) : idx;
+        const data = state.study.data;
+        const marked = primaryIdx >= 0 && data && data.cues[primaryIdx] && data.cues[primaryIdx].r > 0;
+        el.textContent = (marked ? "🔖 " : "") + text;
     }
 
     function completeCommuteSession(sess) {
