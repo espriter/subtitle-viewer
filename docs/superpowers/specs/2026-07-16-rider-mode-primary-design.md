@@ -125,15 +125,54 @@ Playwright로 실기 서버(8091) 대상 검증: 라이딩 화면 진입 → 재
 **발견한 버그 (수정함)**: `bumpReplayCount()`가 `state.study.data`가 없으면 조용히
 no-op — 이 데이터는 `ensureStudy()`가 최초 호출될 때만 채워지는데, 기존에는
 라이딩 모드 진입/세션반복 토글/리뷰 진입 세 경로에서만 호출되고 있었다. Reader에서
-곧장 오디오를 재생하고 마킹 버튼(또는 이어폰 ⏮)을 누르면 마킹이 **조용히 유실**되는
-경로가 이미 존재했던 것 — Reader 마킹 버튼을 추가하며 실사용 시나리오로 재현됨.
-`bumpReplayCount()` 맨 앞에 `ensureStudy()` 호출을 추가해 호출자와 무관하게(이어폰
-⏮ 포함) 항상 study 레코드가 준비되도록 근본 수정.
+곧장 오디오를 재생하고 마킹 버튼을 누르면 마킹이 **조용히 유실**되는 경로가 이미
+존재했던 것 — Reader 마킹 버튼을 추가하며 실사용 시나리오로 재현됨. `bumpReplayCount()`
+맨 앞에 `ensureStudy()` 호출을 추가해 근본 수정.
+(정정: Reader의 이어폰 ⏮은 `navigate(-1)`로 가고 `bumpReplayCount`를 타지 않으므로
+이 버그의 영향을 받지 않았음 — 실제로 유실되던 경로는 Reader의 두 온스크린 마킹
+버튼뿐. 라이딩 모드의 이어폰 ⏮은 진입 시 이미 `ensureStudy()`를 호출하므로 원래도
+안전했음.)
 
 레이아웃: 리더 하단 독 아이콘 버튼이 3개→4개로 늘며 360px 폭에서 이전/다음 버튼이
 26px까지 줄어드는 회귀 발견 → `@media (max-width: 420px)`에서 아이콘 버튼 54→44px,
 gap 12→8px로 축소해 이전/다음을 44px 이상으로 복구 (360/375/414px, 데스크톱 800px
-Playwright로 확인).
+Playwright로 확인). 320px급 구형 기기는 이 수정 이후에도 44px 미만(계산상 ~36px)이지만
+수정 이전에도 이미 44px 미만(~39px)이던 기존 한계라 이번 회귀는 아님 — 별도 과제로
+남김.
+
+## Addendum (2026-07-18c): QA 리뷰로 발견한 버그 2건 수정
+
+10개 앵글 병렬 코드리뷰(`/code-review --effort high`)로 이전 addendum의 구현을 다시
+검증, 두 가지 실제 버그를 발견해 수정:
+
+1. **`ensureStudy()`의 confirm() 대화상자가 가벼운 탭에서도 뜰 수 있었음**: 자막
+   구성이 바뀐 이력이 있는 영화를 Reader에서 열고 마킹 버튼을 처음 누르면,
+   `ensureStudy()`가 "학습 기록을 초기화할까요?" `confirm()`을 띄울 수 있었다(화면을
+   안 보고 있을 수도 있는 경로에서 재생을 막는 모달). `ensureStudy(silent)` 파라미터를
+   추가해 `bumpReplayCount()`에서는 `ensureStudy(true)`로 호출 — 대화상자 없이 "취소"를
+   누른 것과 동일한 안전한 기본값(기존 마킹/진도 보존, srtFile/cueCount만 갱신)으로
+   처리.
+2. **Reader 마킹 버튼이 화면과 다른 문장을 마킹할 수 있었음**: `replayCurrentSentence()`를
+   그대로 재사용했는데, 이 함수는 `audio.currentTime` 기준으로 문장을 찾는다. Reader는
+   자막 자동싱크 OFF거나 오디오가 정지된 채로 자막만 넘길 수 있어(`navigate()`는
+   `!audio.paused`일 때만 오디오를 따라 시크) `state.position`(화면에 보이는 문장)과
+   오디오 위치가 어긋날 수 있음 — 이 상태에서 마킹하면 화면과 다른 문장이 마킹됨.
+   `markReaderPosition()`을 새로 분리해 `state.position` 기준으로 마킹하고, 오디오는
+   이미 재생 중일 때만 문장 시작으로 이어 재생(정지 중이면 건드리지 않음 — 조용히
+   읽던 흐름을 방해하지 않기 위함). 라이딩 모드는 화면 표시 자체가 오디오 위치 기준이라
+   기존 `replayCurrentSentence()` 그대로 사용.
+
+부수 수정: 디바운스(300ms)로 걸러진 탭에서도 버튼이 "✓"로 깜빡이던 거짓 피드백을
+`replayCurrentSentence()`/`markReaderPosition()`이 성공 여부를 반환하도록 고쳐 제거.
+`setupAudio()`의 4버튼 show/hide 중복 블록(각 8줄)을 `.btn-loop` 클래스 기반
+`$$(".btn-loop").forEach(...)` 한 줄로 축소(이미 마크업에서 4개 버튼이 공유하던
+클래스라 별도 그룹핑 없이 재사용).
+
+Playwright로 검증: (a) 자동싱크 OFF + 오디오 정지 + 자막 10개 앞으로 이동 후 마킹 →
+화면에 보이던 인덱스(10)가 정확히 마킹되고 오디오는 계속 정지 상태 유지, (b) 자막
+구성이 다른 저장 기록이 있는 영화를 Reader에서 열고 마킹 → `confirm()` 미발생 +
+기존 마킹 보존 + 새 마킹 정상 기록, (c) 300ms 내 연속 탭 → 두 번째 탭은 무시되고
+마킹 횟수 1회만 기록.
 
 ## Manual Test Checklist
 

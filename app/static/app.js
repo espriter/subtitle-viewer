@@ -271,7 +271,10 @@
     }
 
     // 현재 영화의 study 레코드를 로드/초기화. 자막 교체 감지 포함.
-    function ensureStudy() {
+    // silent=true면 자막 구성 변경 확인 대화상자를 띄우지 않고 기존 기록을 그대로 유지
+    // (이어폰/온스크린 마킹처럼 화면을 안 보고 있을 수도 있는 경로에서 confirm()으로
+    // 재생을 막지 않기 위함 — 사용자가 취소를 눌렀을 때와 동일한 안전한 기본값)
+    function ensureStudy(silent) {
         const movie = state.currentMovie;
         const cueCount = state.subtitles.primary.length;
         const srtFile = state.selectedFiles[0] || null;
@@ -280,7 +283,7 @@
 
         let data = loadStudy(movie);
         if (data && (data.cueCount !== cueCount || data.srtFile !== srtFile)) {
-            const reset = confirm(
+            const reset = !silent && confirm(
                 "자막 구성이 바뀐 것 같습니다. 학습 기록(마킹/진도)을 초기화할까요?\n(취소하면 기존 기록을 그대로 사용합니다)"
             );
             if (reset) {
@@ -726,14 +729,7 @@
             container.classList.add("hidden");
             audio.removeAttribute("src");
             audio.load();
-            const btnLoop = $("#btn-loop");
-            if (btnLoop) btnLoop.classList.add("hidden");
-            const btnSessionRepeat = $("#btn-session-repeat");
-            if (btnSessionRepeat) btnSessionRepeat.classList.add("hidden");
-            const btnCommute = $("#btn-commute");
-            if (btnCommute) btnCommute.classList.add("hidden");
-            const btnReaderMark = $("#btn-reader-mark");
-            if (btnReaderMark) btnReaderMark.classList.add("hidden");
+            $$(".btn-loop").forEach((b) => b.classList.add("hidden"));
             return;
         }
 
@@ -765,14 +761,7 @@
 
         applyPlaybackRate();
 
-        const btnLoop = $("#btn-loop");
-        if (btnLoop) btnLoop.classList.remove("hidden");
-        const btnSessionRepeat = $("#btn-session-repeat");
-        if (btnSessionRepeat) btnSessionRepeat.classList.remove("hidden");
-        const btnCommute = $("#btn-commute");
-        if (btnCommute) btnCommute.classList.remove("hidden");
-        const btnReaderMark = $("#btn-reader-mark");
-        if (btnReaderMark) btnReaderMark.classList.remove("hidden");
+        $$(".btn-loop").forEach((b) => b.classList.remove("hidden"));
     }
 
     function applyPlaybackRate() {
@@ -1758,16 +1747,22 @@
         updateCommuteSummary();
     }
 
-    // 이어폰 ⏮ — 현재 문장 처음부터 다시 + 암묵 마킹(replayCount++)
+    // 마킹 액션(이어폰/온스크린 공용) 더블 파이어 디바운스
     let lastReplayAt = 0;
-    function replayCurrentSentence() {
+    function debounceMarkAction() {
         const now = Date.now();
-        if (now - lastReplayAt < 300) return; // 이어버드 더블 파이어 디바운스
+        if (now - lastReplayAt < 300) return false;
         lastReplayAt = now;
+        return true;
+    }
+
+    // 이어폰 ⏮ — 현재 문장 처음부터 다시 + 암묵 마킹(replayCount++). 성공 시 true 반환.
+    function replayCurrentSentence() {
+        if (!debounceMarkAction()) return false;
 
         const audio = $("#audio-player");
         const subs = state.subtitles.primary;
-        if (subs.length === 0) return;
+        if (subs.length === 0) return false;
         const t = audio.currentTime + state.settings.syncOffset;
         let idx = findSubtitleAtTime(subs, t);
         if (idx < 0) {
@@ -1781,12 +1776,32 @@
         if (state.playlist.active) state.loop._done = 0; // 재청취는 반복 카운트 리셋
         audio.currentTime = Math.max(0, audioTimeForSubtitleStart(idx) - 0.3);
         audio.play().catch(() => {});
+        return true;
     }
 
-    // 화면 보고 있을 때 탭으로 바로 마킹 — replayCurrentSentence()와 동일 동작(이어폰 ⏮의 온스크린 버전)
-    // 라이딩/리더 화면 공용 (#btn-commute-mark, #btn-reader-mark)
+    // Reader 온스크린 마킹 — 오디오 재생 위치가 아니라 "화면에 보이는 문장"(state.position) 기준.
+    // Reader는 자막을 오디오와 별개로 넘길 수 있어(자동싱크 OFF, 또는 정지 중 탐색) 오디오 위치
+    // 기준인 replayCurrentSentence()를 그대로 쓰면 화면과 다른 문장이 마킹될 수 있음. 오디오는
+    // 이미 재생 중일 때만 문장 시작으로 맞춰 이어간다(정지 중이면 조용히 읽던 흐름을 방해하지 않음).
+    function markReaderPosition() {
+        if (!debounceMarkAction()) return false;
+        const subs = state.subtitles.primary;
+        if (subs.length === 0) return false;
+        const idx = state.position;
+        bumpReplayCount(idx);
+        const audio = $("#audio-player");
+        if (state.audioFile && audio.src && !audio.paused) {
+            audio.currentTime = Math.max(0, audioTimeForSubtitleStart(idx) - 0.3);
+            audio.play().catch(() => {});
+        }
+        return true;
+    }
+
+    // 화면 보고 있을 때 탭으로 바로 마킹(이어폰 ⏮의 온스크린 버전) — 라이딩/리더 화면 공용
+    // (#btn-commute-mark, #btn-reader-mark). 실제로 마킹됐을 때만 확인 표시.
     function markCurrentSentenceOnScreen(event) {
-        replayCurrentSentence();
+        const marked = state.mode === "commute" ? replayCurrentSentence() : markReaderPosition();
+        if (!marked) return;
         const btn = event.currentTarget;
         if (btn.dataset.label === undefined) btn.dataset.label = btn.textContent;
         clearTimeout(btn._resetTimer);
@@ -1814,7 +1829,10 @@
     }
 
     function bumpReplayCount(idx) {
-        ensureStudy(); // 라이딩/세션반복/리뷰 중 하나도 거치지 않은 채 마킹하면 state.study.data가 아직 없을 수 있음
+        // silent=true: 라이딩/세션반복/리뷰 중 하나도 거치지 않은 채 마킹하면 state.study.data가
+        // 아직 없을 수 있어 여기서 초기화하되, 이어폰/온스크린처럼 화면을 안 볼 수도 있는 경로라
+        // confirm() 대화상자로 재생을 막지 않는다.
+        ensureStudy(true);
         const data = state.study.data;
         if (!data) return;
         const key = String(idx);
