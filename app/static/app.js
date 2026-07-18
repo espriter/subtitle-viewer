@@ -630,6 +630,10 @@
         const primary = getVisibleEntries(state.subtitles.primary, state.position);
         const secondary = getVisibleEntries(state.subtitles.secondary, state.positionSecondary);
 
+        // 마킹 배지를 그리려면 현재 영화의 study 기록이 로드돼 있어야 함 — 라이딩/세션반복/리뷰
+        // 중 하나도 거치지 않고 바로 Reader를 열면(또는 다른 영화에서 넘어오면) state.study.data가
+        // 이전 영화 것이거나 비어 있을 수 있음. silent=true로 확인 대화상자 없이 조용히 동기화.
+        ensureStudy(true);
         const studyCues = state.study.data ? state.study.data.cues : null;
         $("#card-primary").innerHTML = primary
             .map((e, i) => {
@@ -1647,9 +1651,8 @@
         if (state.settings.commuteRepeat && state.study.repeatCount > 0) {
             line += ` · 🔁 ${state.study.repeatCount + 1}회째`;
         }
-        const sessionMarks = markedCuesInOrder().filter(
-            (idx) => idx >= sess.startCue && idx <= sess.endCue
-        ).length;
+        const marks = markedCuesInOrder();
+        const sessionMarks = marks.filter((idx) => idx >= sess.startCue && idx <= sess.endCue).length;
         if (sessionMarks > 0) {
             line += ` · 🔖 ${sessionMarks}개`;
         }
@@ -1657,12 +1660,11 @@
 
         const plBtn = $("#btn-commute-playlist");
         if (plBtn) {
-            const marked = markedCuesInOrder().length;
-            plBtn.classList.toggle("hidden", marked === 0 && !state.playlist.active);
+            plBtn.classList.toggle("hidden", marks.length === 0 && !state.playlist.active);
             plBtn.classList.toggle("active", state.playlist.active);
             plBtn.textContent = state.playlist.active
                 ? "⏹ 복습 중지"
-                : `🔁 복습 재생 (${marked}문장)`;
+                : `🔁 복습 재생 (${marks.length}문장)`;
         }
     }
 
@@ -1789,8 +1791,13 @@
 
         bumpReplayCount(idx);
         if (state.playlist.active) state.loop._done = 0; // 재청취는 반복 카운트 리셋
-        // 이어폰/온스크린 버튼 둘 다 여기로 들어오므로 마킹 개수 표시를 여기서 한 번에 갱신
-        if (state.mode === "commute") updateCommuteSummary();
+        // 이어폰/온스크린 버튼 둘 다 여기로 들어오므로 마킹 개수·배지 표시를 여기서 한 번에 갱신
+        // (재생 시작 후 다음 timeupdate tick을 기다리지 않고 바로 반영 — play()가 autoplay 정책에
+        // 막혀도 방금 마킹한 문장의 배지는 즉시 보이도록)
+        if (state.mode === "commute") {
+            updateCommuteSummary();
+            updateCommuteNow(timeToSeconds(subs[idx].start));
+        }
         audio.currentTime = Math.max(0, audioTimeForSubtitleStart(idx) - 0.3);
         audio.play().catch(() => {});
         return true;
@@ -2265,7 +2272,7 @@
                 state.settings.commuteSubtitle = b.dataset.commuteSubtitle;
                 saveSettings();
                 applySettings();
-                updateCommuteNow($("#audio-player").currentTime);
+                updateCommuteNow($("#audio-player").currentTime + state.settings.syncOffset);
             });
         });
 
