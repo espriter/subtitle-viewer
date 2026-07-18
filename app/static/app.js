@@ -630,8 +630,12 @@
         const primary = getVisibleEntries(state.subtitles.primary, state.position);
         const secondary = getVisibleEntries(state.subtitles.secondary, state.positionSecondary);
 
+        const studyCues = state.study.data ? state.study.data.cues : null;
         $("#card-primary").innerHTML = primary
-            .map((e) => `<div>${sanitizeSubtitleHtml(e.text).replace(/\n/g, "<br>")}</div>`)
+            .map((e, i) => {
+                const marked = studyCues && studyCues[state.position + i] && studyCues[state.position + i].r > 0;
+                return `<div>${marked ? "🔖 " : ""}${sanitizeSubtitleHtml(e.text).replace(/\n/g, "<br>")}</div>`;
+            })
             .join("");
 
         $("#card-secondary").innerHTML = secondary
@@ -1802,6 +1806,7 @@
         if (subs.length === 0) return false;
         const idx = state.position;
         bumpReplayCount(idx);
+        renderSubtitles(); // 방금 마킹한 문장에 배지가 바로 보이도록
         const audio = $("#audio-player");
         if (state.audioFile && audio.src && !audio.paused) {
             audio.currentTime = Math.max(0, audioTimeForSubtitleStart(idx) - 0.3);
