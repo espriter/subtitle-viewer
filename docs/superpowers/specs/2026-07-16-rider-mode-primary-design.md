@@ -180,6 +180,29 @@ Playwright로 검증: (a) 자동싱크 OFF + 오디오 정지 + 자막 10개 앞
 추가. Playwright로 마킹 직후 50ms 내 `visibilitychange`를 발생시켜 `updatedAt`이
 갱신되고 마킹이 저장됨을 확인.
 
+## Addendum (2026-07-18d): 마킹 배지 기능 + 후속 리뷰 수정
+
+세션 반복재생이 기본이라 같은 문장을 여러 번 다시 만나므로, 이미 마킹한 문장을
+알아볼 수 있게 `🔖` 배지를 추가: 라이딩 모드 세션 요약에 "이번 세션 마킹 N개"
+(`updateCommuteSummary`), 현재 재생 중인 문장 표시(`updateCommuteNow`, primary/secondary
+인덱스 공간이 달라 별도 조회), Reader 자막 카드(`renderSubtitles`, `state.position + i`
+기준, `linesPerView` 다중 표시 시에도 현재 문장에만 정확히 표시).
+
+타겟 리뷰(3앵글)로 실제 버그 발견·수정:
+- `renderSubtitles()`가 `state.study.data`를 확인 없이 읽어 (a) Reader를 바로 열면
+  기존 마킹의 배지가 전혀 안 보이고 (b) 다른 영화로 넘어가면 이전 영화 마킹이 새
+  영화 문장에 잘못 표시될 수 있었음 — 실기 확인(마킹 → 새로고침 → 이어읽기 → 배지
+  없음) 후 `renderSubtitles()` 진입 시 `ensureStudy(true)`로 근본 수정.
+- 1st/2nd 자막 전환 핸들러가 `syncOffset`을 빠뜨린 기존 버그(내 배지 기능이 처음으로
+  가시화) 수정.
+- 마킹 직후 배지가 다음 재생 tick에 의존해 늦게 뜨던 것을 `replayCurrentSentence()`에서
+  `updateCommuteNow()` 즉시 호출로 수정.
+
+**보류(범위 밖)**: 같은 영화에서 primary 자막 파일을 바꿔가며 마킹하면
+`ensureStudy()`가 영화 단위로만 캐시를 구분해 인덱스가 어긋날 수 있음 — 발생
+빈도가 낮고(듀얼 자막 영화에서 의도적으로 파일을 바꿔야 함) `ensureStudy()` 자체의
+더 넓은 재설계가 필요해 이번 라운드에서는 손대지 않음.
+
 ## Manual Test Checklist
 
 1. 홈 화면 진입 시 라이딩 모드 카드가 최상단 큰 카드로 보이는가. 나머지는 "더보기"
