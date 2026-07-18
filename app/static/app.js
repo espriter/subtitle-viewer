@@ -732,6 +732,8 @@
             if (btnSessionRepeat) btnSessionRepeat.classList.add("hidden");
             const btnCommute = $("#btn-commute");
             if (btnCommute) btnCommute.classList.add("hidden");
+            const btnReaderMark = $("#btn-reader-mark");
+            if (btnReaderMark) btnReaderMark.classList.add("hidden");
             return;
         }
 
@@ -769,6 +771,8 @@
         if (btnSessionRepeat) btnSessionRepeat.classList.remove("hidden");
         const btnCommute = $("#btn-commute");
         if (btnCommute) btnCommute.classList.remove("hidden");
+        const btnReaderMark = $("#btn-reader-mark");
+        if (btnReaderMark) btnReaderMark.classList.remove("hidden");
     }
 
     function applyPlaybackRate() {
@@ -1780,13 +1784,13 @@
     }
 
     // 화면 보고 있을 때 탭으로 바로 마킹 — replayCurrentSentence()와 동일 동작(이어폰 ⏮의 온스크린 버전)
-    function markCurrentSentenceOnScreen() {
+    // 라이딩/리더 화면 공용 (#btn-commute-mark, #btn-reader-mark)
+    function markCurrentSentenceOnScreen(event) {
         replayCurrentSentence();
-        const btn = $("#btn-commute-mark");
-        if (!btn) return;
+        const btn = event.currentTarget;
         if (btn.dataset.label === undefined) btn.dataset.label = btn.textContent;
         clearTimeout(btn._resetTimer);
-        btn.textContent = "✓ 마킹됨";
+        btn.textContent = "✓";
         btn._resetTimer = setTimeout(() => {
             btn.textContent = btn.dataset.label;
         }, 900);
@@ -1810,6 +1814,7 @@
     }
 
     function bumpReplayCount(idx) {
+        ensureStudy(); // 라이딩/세션반복/리뷰 중 하나도 거치지 않은 채 마킹하면 state.study.data가 아직 없을 수 있음
         const data = state.study.data;
         if (!data) return;
         const key = String(idx);
@@ -2189,6 +2194,7 @@
         $("#btn-loop-cancel").addEventListener("click", cancelLoop);
         $("#btn-session-repeat").addEventListener("click", toggleSessionRepeat);
         $("#btn-loop-replay").addEventListener("click", replayLoop);
+        $("#btn-reader-mark").addEventListener("click", markCurrentSentenceOnScreen);
         $("#loop-indicator-main").addEventListener("click", () => showLoopSetup(true));
 
         // Loop options (repeat count / end gap)

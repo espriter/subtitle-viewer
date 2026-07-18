@@ -1123,6 +1123,13 @@ header h1 {
 }
 
 /* ===== Responsive ===== */
+/* 아이콘 버튼이 4개(구간반복/세션반복/라이딩모드/마킹)로 늘어나 좁은 화면에서 이전/다음
+   버튼이 44px 밑으로 줄어드는 것 방지 */
+@media (max-width: 420px) {
+    #nav-controls { gap: 8px; }
+    .btn-loop { width: 44px; }
+}
+
 @media (min-width: 768px) {
     .btn-nav { height: 60px; }
     #home-screen { padding: 72px 40px 48px; }

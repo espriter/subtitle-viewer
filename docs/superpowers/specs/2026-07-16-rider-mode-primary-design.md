@@ -113,6 +113,28 @@ Playwright로 실기 서버(8091) 대상 검증: 라이딩 화면 진입 → 재
 `localStorage`의 `study.cues[idx].r` 증가 + 오디오가 문장 시작으로 되감김 + 버튼
 텍스트 일시 변경 확인.
 
+## Addendum (2026-07-18b): Reader에도 동일 버튼 추가 + 마킹 유실 버그 수정
+
+백로그 원문의 "(또는 Reader)"를 마저 구현. `nav-controls`(리더 하단 독)에
+`#btn-reader-mark`(🔖) 추가 — `setupAudio()`의 기존 show/hide 3종(`btn-loop`/
+`btn-session-repeat`/`btn-commute`) 패턴에 맞춰 오디오 유무로 노출. 클릭 핸들러는
+`markCurrentSentenceOnScreen(event)`를 `#btn-commute-mark`와 공유하도록 일반화
+(`event.currentTarget` 사용) — 아이콘 전용 버튼(54px 고정폭)에서도 넘치지 않도록
+확인 플래시 문구를 "✓ 마킹됨" → "✓"로 통일.
+
+**발견한 버그 (수정함)**: `bumpReplayCount()`가 `state.study.data`가 없으면 조용히
+no-op — 이 데이터는 `ensureStudy()`가 최초 호출될 때만 채워지는데, 기존에는
+라이딩 모드 진입/세션반복 토글/리뷰 진입 세 경로에서만 호출되고 있었다. Reader에서
+곧장 오디오를 재생하고 마킹 버튼(또는 이어폰 ⏮)을 누르면 마킹이 **조용히 유실**되는
+경로가 이미 존재했던 것 — Reader 마킹 버튼을 추가하며 실사용 시나리오로 재현됨.
+`bumpReplayCount()` 맨 앞에 `ensureStudy()` 호출을 추가해 호출자와 무관하게(이어폰
+⏮ 포함) 항상 study 레코드가 준비되도록 근본 수정.
+
+레이아웃: 리더 하단 독 아이콘 버튼이 3개→4개로 늘며 360px 폭에서 이전/다음 버튼이
+26px까지 줄어드는 회귀 발견 → `@media (max-width: 420px)`에서 아이콘 버튼 54→44px,
+gap 12→8px로 축소해 이전/다음을 44px 이상으로 복구 (360/375/414px, 데스크톱 800px
+Playwright로 확인).
+
 ## Manual Test Checklist
 
 1. 홈 화면 진입 시 라이딩 모드 카드가 최상단 큰 카드로 보이는가. 나머지는 "더보기"
