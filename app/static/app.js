@@ -1643,6 +1643,12 @@
         if (state.settings.commuteRepeat && state.study.repeatCount > 0) {
             line += ` · 🔁 ${state.study.repeatCount + 1}회째`;
         }
+        const sessionMarks = markedCuesInOrder().filter(
+            (idx) => idx >= sess.startCue && idx <= sess.endCue
+        ).length;
+        if (sessionMarks > 0) {
+            line += ` · 🔖 ${sessionMarks}개`;
+        }
         el.textContent = line;
 
         const plBtn = $("#btn-commute-playlist");
@@ -1774,6 +1780,8 @@
 
         bumpReplayCount(idx);
         if (state.playlist.active) state.loop._done = 0; // 재청취는 반복 카운트 리셋
+        // 이어폰/온스크린 버튼 둘 다 여기로 들어오므로 마킹 개수 표시를 여기서 한 번에 갱신
+        if (state.mode === "commute") updateCommuteSummary();
         audio.currentTime = Math.max(0, audioTimeForSubtitleStart(idx) - 0.3);
         audio.play().catch(() => {});
         return true;
