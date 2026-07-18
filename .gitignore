@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 subtitles/
 .superpowers/
+.playwright-mcp/
