@@ -681,6 +681,46 @@ header h1 {
 }
 .time-jump-feedback.hidden { display: none; }
 
+/* YouTube import */
+.section-divider {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    margin: 16px 0 2px;
+}
+
+.youtube-import-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 13px;
+}
+
+.youtube-import-input {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-strong);
+    border-radius: 9px;
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 14px;
+    width: 100%;
+    transition: border-color 0.15s;
+}
+
+.youtube-import-input:focus { outline: none; border-color: var(--accent); }
+.youtube-import-input::placeholder { color: var(--text-muted); }
+
+.youtube-import-preview {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: -4px;
+}
+.youtube-import-preview.hidden { display: none; }
+
 .audio-error-banner {
     background: rgba(251,113,133,0.14);
     border: 1px solid rgba(251,113,133,0.35);

@@ -99,15 +99,12 @@
             );
             return resp;
         },
-        async fetchYoutube(movie, url) {
-            const resp = await fetch(
-                `api/movies/${encodeURIComponent(movie)}/fetch-youtube`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ url }),
-                }
-            );
+        async fetchYoutube(name, url) {
+            const resp = await fetch("api/movies/fetch-youtube", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, url }),
+            });
             return resp;
         },
     };
@@ -470,11 +467,38 @@
         }
     }
 
+    // 서버(_sanitize_movie_name)와 동일한 규칙의 미리보기 전용 사본.
+    // 실제 폴더명은 서버가 최종 결정한다 — 여기선 입력 중 즉시 피드백만 보여준다.
+    function sanitizeMovieNamePreview(raw) {
+        return raw.replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "");
+    }
+
+    function updateYoutubeImportPreview() {
+        const nameInput = $("#youtube-import-name");
+        const preview = $("#youtube-import-preview");
+        if (!nameInput || !preview) return;
+        const raw = nameInput.value.trim();
+        const sanitized = sanitizeMovieNamePreview(raw);
+        if (!raw || sanitized === raw) {
+            preview.classList.add("hidden");
+            preview.textContent = "";
+        } else {
+            preview.classList.remove("hidden");
+            preview.textContent = sanitized
+                ? `폴더명: ${sanitized}`
+                : "영문/숫자/-/_ 를 하나 이상 포함하세요";
+        }
+    }
+
     async function fetchYoutube() {
-        const name = prompt("새 폴더 이름을 입력하세요 (영문, 숫자, 하이픈, 언더스코어만 가능):");
-        if (!name) return;
-        const url = prompt("유튜브 링크를 입력하세요:");
-        if (!url) return;
+        const nameInput = $("#youtube-import-name");
+        const urlInput = $("#youtube-import-url");
+        const name = nameInput.value.trim();
+        const url = urlInput.value.trim();
+        if (!name || !url) {
+            alert("폴더 이름과 유튜브 링크를 모두 입력하세요.");
+            return;
+        }
 
         const btn = $("#btn-create-youtube");
         const originalText = btn ? btn.textContent : "";
@@ -483,13 +507,16 @@
             btn.textContent = "다운로드 중... (몇 분 소요될 수 있음)";
         }
         try {
-            const resp = await api.fetchYoutube(name.trim(), url.trim());
+            const resp = await api.fetchYoutube(name, url);
+            const body = await resp.json();
             if (resp.ok) {
+                nameInput.value = "";
+                urlInput.value = "";
+                updateYoutubeImportPreview();
                 await loadMovies();
-                alert("가져오기 완료: " + name.trim());
+                alert("가져오기 완료: " + body.movie);
             } else {
-                const err = await resp.json();
-                alert(err.detail || "유튜브 가져오기 실패");
+                alert(body.detail || "유튜브 가져오기 실패");
             }
         } catch {
             alert("유튜브 가져오기 실패. 네트워크를 확인하고 다시 시도하세요.");
@@ -2275,6 +2302,16 @@
         const btnCreateYoutube = $("#btn-create-youtube");
         if (btnCreateYoutube) {
             btnCreateYoutube.addEventListener("click", fetchYoutube);
+        }
+        const youtubeImportName = $("#youtube-import-name");
+        if (youtubeImportName) {
+            youtubeImportName.addEventListener("input", updateYoutubeImportPreview);
+        }
+        const youtubeImportUrl = $("#youtube-import-url");
+        if (youtubeImportUrl) {
+            youtubeImportUrl.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") fetchYoutube();
+            });
         }
 
         // Loop

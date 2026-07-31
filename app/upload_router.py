@@ -19,7 +19,16 @@ class CreateMovieRequest(BaseModel):
 
 
 class FetchYoutubeRequest(BaseModel):
+    name: str
     url: str
+
+
+def _sanitize_movie_name(raw: str) -> str:
+    """유튜브 영상 제목처럼 공백/특수문자가 섞인 입력을 폴더명으로 쓸 수 있게,
+    허용되지 않는 문자 구간을 밑줄 하나로 뭉쳐 치환한다 (거부 대신 자동 정리).
+    ponytail: 대상 문자셋은 기존 _SAFE_NAME과 동일한 ASCII로 제한 — 한글 등
+    비ASCII 제목은 대부분 _ 로 치환된다. 필요해지면 _SAFE_NAME 자체를 넓힌다."""
+    return re.sub(r"[^a-zA-Z0-9_-]+", "_", raw).strip("_")
 
 
 def create_upload_router(subtitles_dir: Path) -> APIRouter:
@@ -70,10 +79,14 @@ def create_upload_router(subtitles_dir: Path) -> APIRouter:
         (movie_dir / file.filename).write_bytes(content)
         return {"uploaded": file.filename}
 
-    @router.post("/api/movies/{movie}/fetch-youtube", status_code=201)
-    def fetch_youtube(movie: str, req: FetchYoutubeRequest):
-        if not _SAFE_NAME.match(movie):
-            raise HTTPException(status_code=400, detail=f"Invalid name: {movie}")
+    @router.post("/api/movies/fetch-youtube", status_code=201)
+    def fetch_youtube(req: FetchYoutubeRequest):
+        movie = _sanitize_movie_name(req.name)
+        if not movie:
+            raise HTTPException(
+                status_code=400,
+                detail="폴더 이름에 영문/숫자/-/_ 를 하나 이상 포함해야 합니다",
+            )
         if not req.url.startswith(("http://", "https://")):
             raise HTTPException(status_code=400, detail="url must be an http(s) URL")
 
