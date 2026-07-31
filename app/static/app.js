@@ -99,6 +99,17 @@
             );
             return resp;
         },
+        async fetchYoutube(movie, url) {
+            const resp = await fetch(
+                `api/movies/${encodeURIComponent(movie)}/fetch-youtube`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url }),
+                }
+            );
+            return resp;
+        },
     };
 
     // --- DOM refs ---
@@ -456,6 +467,37 @@
             }
         } catch {
             alert("폴더 생성 실패. 네트워크를 확인하고 다시 시도하세요.");
+        }
+    }
+
+    async function fetchYoutube() {
+        const name = prompt("새 폴더 이름을 입력하세요 (영문, 숫자, 하이픈, 언더스코어만 가능):");
+        if (!name) return;
+        const url = prompt("유튜브 링크를 입력하세요:");
+        if (!url) return;
+
+        const btn = $("#btn-create-youtube");
+        const originalText = btn ? btn.textContent : "";
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = "다운로드 중... (몇 분 소요될 수 있음)";
+        }
+        try {
+            const resp = await api.fetchYoutube(name.trim(), url.trim());
+            if (resp.ok) {
+                await loadMovies();
+                alert("가져오기 완료: " + name.trim());
+            } else {
+                const err = await resp.json();
+                alert(err.detail || "유튜브 가져오기 실패");
+            }
+        } catch {
+            alert("유튜브 가져오기 실패. 네트워크를 확인하고 다시 시도하세요.");
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
         }
     }
 
@@ -2227,6 +2269,12 @@
         const btnCreate = $("#btn-create-movie");
         if (btnCreate) {
             btnCreate.addEventListener("click", createMovie);
+        }
+
+        // Create movie folder from a YouTube link (in movie list sub-view)
+        const btnCreateYoutube = $("#btn-create-youtube");
+        if (btnCreateYoutube) {
+            btnCreateYoutube.addEventListener("click", fetchYoutube);
         }
 
         // Loop

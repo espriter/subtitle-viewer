@@ -78,3 +78,73 @@ def test_upload_disabled(client_no_upload, tmp_path):
     (tmp_path / "inception").mkdir()
     resp = client_no_upload.post("/api/movies", json={"name": "test"})
     assert resp.status_code == 405 or resp.status_code == 404
+
+
+def test_fetch_youtube_invalid_movie_name(client):
+    resp = client.post(
+        "/api/movies/../etc/fetch-youtube",
+        json={"url": "https://www.youtube.com/watch?v=x"},
+    )
+    assert resp.status_code in (400, 404)
+
+
+def test_fetch_youtube_invalid_url(client, tmp_path):
+    (tmp_path / "inception").mkdir()
+    resp = client.post(
+        "/api/movies/inception/fetch-youtube",
+        json={"url": "not-a-url"},
+    )
+    assert resp.status_code == 400
+
+
+def test_fetch_youtube_success(client, tmp_path, monkeypatch):
+    import subprocess as subprocess_module
+
+    def fake_run(cmd, capture_output, text, timeout):
+        movie_dir = tmp_path / cmd[1]
+        movie_dir.mkdir(parents=True, exist_ok=True)
+        (movie_dir / "audio.mp3").write_bytes(b"fake")
+        (movie_dir / "sub_en.srt").write_text("1\n00:00:01,000 --> 00:00:02,000\nHi\n")
+        return subprocess_module.CompletedProcess(cmd, 0, stdout="ok", stderr="")
+
+    monkeypatch.setattr("app.upload_router.subprocess.run", fake_run)
+
+    resp = client.post(
+        "/api/movies/yt_movie/fetch-youtube",
+        json={"url": "https://www.youtube.com/watch?v=jNQXAC9IVRw"},
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["movie"] == "yt_movie"
+    assert set(body["files"]) == {"audio.mp3", "sub_en.srt"}
+
+
+def test_fetch_youtube_script_failure(client, monkeypatch):
+    import subprocess as subprocess_module
+
+    def fake_run(cmd, capture_output, text, timeout):
+        return subprocess_module.CompletedProcess(cmd, 1, stdout="", stderr="yt-dlp: video unavailable")
+
+    monkeypatch.setattr("app.upload_router.subprocess.run", fake_run)
+
+    resp = client.post(
+        "/api/movies/yt_movie/fetch-youtube",
+        json={"url": "https://www.youtube.com/watch?v=deadbeef"},
+    )
+    assert resp.status_code == 502
+    assert "unavailable" in resp.json()["detail"]
+
+
+def test_fetch_youtube_timeout(client, monkeypatch):
+    import subprocess as subprocess_module
+
+    def fake_run(cmd, capture_output, text, timeout):
+        raise subprocess_module.TimeoutExpired(cmd, timeout)
+
+    monkeypatch.setattr("app.upload_router.subprocess.run", fake_run)
+
+    resp = client.post(
+        "/api/movies/yt_movie/fetch-youtube",
+        json={"url": "https://www.youtube.com/watch?v=deadbeef"},
+    )
+    assert resp.status_code == 504

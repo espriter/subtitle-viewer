@@ -1,4 +1,5 @@
 import re
+import subprocess
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
@@ -7,9 +8,18 @@ from pydantic import BaseModel
 _SAFE_NAME = re.compile(r"^[a-zA-Z0-9_\-]+(\.[a-zA-Z0-9_\-]+)*$")
 _MAX_FILE_SIZE = 1024 * 1024  # 1MB
 
+# ponytail: 큐/폴링 없이 요청 하나로 블로킹 처리 — 개인용 단일 사용자라 동시 다운로드 경합이
+# 없고, 실패해도 재시도 비용이 낮다. 다중 사용자로 커지면 백그라운드 잡 + 진행률 API로 승격.
+_YOUTUBE_FETCH_TIMEOUT_SEC = 1200  # 20분
+_FETCH_YOUTUBE_SCRIPT = Path(__file__).resolve().parent.parent / "ops" / "fetch-youtube.sh"
+
 
 class CreateMovieRequest(BaseModel):
     name: str
+
+
+class FetchYoutubeRequest(BaseModel):
+    url: str
 
 
 def create_upload_router(subtitles_dir: Path) -> APIRouter:
@@ -59,5 +69,35 @@ def create_upload_router(subtitles_dir: Path) -> APIRouter:
 
         (movie_dir / file.filename).write_bytes(content)
         return {"uploaded": file.filename}
+
+    @router.post("/api/movies/{movie}/fetch-youtube", status_code=201)
+    def fetch_youtube(movie: str, req: FetchYoutubeRequest):
+        if not _SAFE_NAME.match(movie):
+            raise HTTPException(status_code=400, detail=f"Invalid name: {movie}")
+        if not req.url.startswith(("http://", "https://")):
+            raise HTTPException(status_code=400, detail="url must be an http(s) URL")
+
+        try:
+            result = subprocess.run(
+                [str(_FETCH_YOUTUBE_SCRIPT), movie, req.url],
+                capture_output=True,
+                text=True,
+                timeout=_YOUTUBE_FETCH_TIMEOUT_SEC,
+            )
+        except subprocess.TimeoutExpired:
+            raise HTTPException(
+                status_code=504,
+                detail="다운로드 시간 초과 (20분). 영상이 너무 길거나 네트워크가 느립니다.",
+            )
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"스크립트 실행 실패: {exc}")
+
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout or "알 수 없는 오류").strip()
+            raise HTTPException(status_code=502, detail=detail[-2000:])
+
+        movie_dir = subtitles_dir / movie
+        files = sorted(f.name for f in movie_dir.iterdir()) if movie_dir.is_dir() else []
+        return {"movie": movie, "files": files}
 
     return router
