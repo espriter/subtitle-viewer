@@ -19,16 +19,8 @@ class CreateMovieRequest(BaseModel):
 
 
 class FetchYoutubeRequest(BaseModel):
-    name: str
+    name: str = ""
     url: str
-
-
-def _sanitize_movie_name(raw: str) -> str:
-    """유튜브 영상 제목처럼 공백/특수문자가 섞인 입력을 폴더명으로 쓸 수 있게,
-    허용되지 않는 문자 구간을 밑줄 하나로 뭉쳐 치환한다 (거부 대신 자동 정리).
-    ponytail: 대상 문자셋은 기존 _SAFE_NAME과 동일한 ASCII로 제한 — 한글 등
-    비ASCII 제목은 대부분 _ 로 치환된다. 필요해지면 _SAFE_NAME 자체를 넓힌다."""
-    return re.sub(r"[^a-zA-Z0-9_-]+", "_", raw).strip("_")
 
 
 def create_upload_router(subtitles_dir: Path) -> APIRouter:
@@ -81,18 +73,13 @@ def create_upload_router(subtitles_dir: Path) -> APIRouter:
 
     @router.post("/api/movies/fetch-youtube", status_code=201)
     def fetch_youtube(req: FetchYoutubeRequest):
-        movie = _sanitize_movie_name(req.name)
-        if not movie:
-            raise HTTPException(
-                status_code=400,
-                detail="폴더 이름에 영문/숫자/-/_ 를 하나 이상 포함해야 합니다",
-            )
         if not req.url.startswith(("http://", "https://")):
             raise HTTPException(status_code=400, detail="url must be an http(s) URL")
 
+        # 폴더명이 비어 있으면 스크립트가 영상 제목에서 자동 생성한다.
         try:
             result = subprocess.run(
-                [str(_FETCH_YOUTUBE_SCRIPT), movie, req.url],
+                [str(_FETCH_YOUTUBE_SCRIPT), req.name.strip(), req.url],
                 capture_output=True,
                 text=True,
                 timeout=_YOUTUBE_FETCH_TIMEOUT_SEC,
@@ -108,6 +95,16 @@ def create_upload_router(subtitles_dir: Path) -> APIRouter:
         if result.returncode != 0:
             detail = (result.stderr or result.stdout or "알 수 없는 오류").strip()
             raise HTTPException(status_code=502, detail=detail[-2000:])
+
+        # 최종 폴더명은 스크립트가 stdout 마지막 줄에 "MOVIE=<name>"으로 보고한다
+        # (이름을 안 줬으면 스크립트가 영상 제목에서 자동 생성하므로, 무엇이
+        # 만들어졌는지는 스크립트만 안다).
+        movie = next(
+            (line[len("MOVIE="):].strip() for line in result.stdout.splitlines() if line.startswith("MOVIE=")),
+            None,
+        )
+        if not movie:
+            raise HTTPException(status_code=500, detail="스크립트가 폴더명을 보고하지 않았습니다")
 
         movie_dir = subtitles_dir / movie
         files = sorted(f.name for f in movie_dir.iterdir()) if movie_dir.is_dir() else []

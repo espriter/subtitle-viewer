@@ -467,8 +467,8 @@
         }
     }
 
-    // 서버(_sanitize_movie_name)와 동일한 규칙의 미리보기 전용 사본.
-    // 실제 폴더명은 서버가 최종 결정한다 — 여기선 입력 중 즉시 피드백만 보여준다.
+    // ops/fetch-youtube.sh의 sanitize_name과 동일한 규칙의 미리보기 전용 사본.
+    // 실제 폴더명은 스크립트가 최종 결정한다 — 여기선 입력 중 즉시 피드백만 보여준다.
     function sanitizeMovieNamePreview(raw) {
         return raw.replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "");
     }
@@ -495,8 +495,8 @@
         const urlInput = $("#youtube-import-url");
         const name = nameInput.value.trim();
         const url = urlInput.value.trim();
-        if (!name || !url) {
-            alert("폴더 이름과 유튜브 링크를 모두 입력하세요.");
+        if (!url) {
+            alert("유튜브 링크를 입력하세요.");
             return;
         }
 
@@ -2306,6 +2306,9 @@
         const youtubeImportName = $("#youtube-import-name");
         if (youtubeImportName) {
             youtubeImportName.addEventListener("input", updateYoutubeImportPreview);
+            youtubeImportName.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") fetchYoutube();
+            });
         }
         const youtubeImportUrl = $("#youtube-import-url");
         if (youtubeImportUrl) {

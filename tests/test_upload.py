@@ -80,52 +80,6 @@ def test_upload_disabled(client_no_upload, tmp_path):
     assert resp.status_code == 405 or resp.status_code == 404
 
 
-def test_fetch_youtube_sanitizes_special_chars(client, tmp_path, monkeypatch):
-    import subprocess as subprocess_module
-
-    def fake_run(cmd, capture_output, text, timeout):
-        movie_dir = tmp_path / cmd[1]
-        movie_dir.mkdir(parents=True, exist_ok=True)
-        (movie_dir / "audio.mp3").write_bytes(b"fake")
-        return subprocess_module.CompletedProcess(cmd, 0, stdout="ok", stderr="")
-
-    monkeypatch.setattr("app.upload_router.subprocess.run", fake_run)
-
-    resp = client.post(
-        "/api/movies/fetch-youtube",
-        json={"name": "End of the Line - Overwatch", "url": "https://www.youtube.com/watch?v=x"},
-    )
-    assert resp.status_code == 201
-    assert resp.json()["movie"] == "End_of_the_Line_-_Overwatch"
-
-
-def test_fetch_youtube_sanitizes_path_traversal(client, tmp_path, monkeypatch):
-    import subprocess as subprocess_module
-
-    def fake_run(cmd, capture_output, text, timeout):
-        movie_dir = tmp_path / cmd[1]
-        movie_dir.mkdir(parents=True, exist_ok=True)
-        return subprocess_module.CompletedProcess(cmd, 0, stdout="ok", stderr="")
-
-    monkeypatch.setattr("app.upload_router.subprocess.run", fake_run)
-
-    resp = client.post(
-        "/api/movies/fetch-youtube",
-        json={"name": "../../etc/passwd", "url": "https://www.youtube.com/watch?v=x"},
-    )
-    assert resp.status_code == 201
-    movie = resp.json()["movie"]
-    assert "/" not in movie and ".." not in movie
-
-
-def test_fetch_youtube_name_empty_after_sanitize(client):
-    resp = client.post(
-        "/api/movies/fetch-youtube",
-        json={"name": "!!!", "url": "https://www.youtube.com/watch?v=x"},
-    )
-    assert resp.status_code == 400
-
-
 def test_fetch_youtube_invalid_url(client):
     resp = client.post(
         "/api/movies/fetch-youtube",
@@ -142,7 +96,7 @@ def test_fetch_youtube_success(client, tmp_path, monkeypatch):
         movie_dir.mkdir(parents=True, exist_ok=True)
         (movie_dir / "audio.mp3").write_bytes(b"fake")
         (movie_dir / "sub_en.srt").write_text("1\n00:00:01,000 --> 00:00:02,000\nHi\n")
-        return subprocess_module.CompletedProcess(cmd, 0, stdout="ok", stderr="")
+        return subprocess_module.CompletedProcess(cmd, 0, stdout=f"ok\nMOVIE={cmd[1]}\n", stderr="")
 
     monkeypatch.setattr("app.upload_router.subprocess.run", fake_run)
 
@@ -154,6 +108,46 @@ def test_fetch_youtube_success(client, tmp_path, monkeypatch):
     body = resp.json()
     assert body["movie"] == "yt_movie"
     assert set(body["files"]) == {"audio.mp3", "sub_en.srt"}
+
+
+def test_fetch_youtube_derives_name_when_omitted(client, tmp_path, monkeypatch):
+    """이름을 비워 보내면 스크립트가 영상 제목에서 폴더명을 만들어 MOVIE=로 보고한다.
+    (폴더명 생성/정리 로직 자체는 ops/fetch-youtube.sh 안에 있고 여기선 subprocess를
+    통째로 모킹하므로, 검증 대상은 '스크립트가 보고한 이름을 그대로 신뢰해 응답한다'는
+    엔드포인트 쪽 계약이다 — 실제 sanitize 동작은 스크립트를 직접 실행해 확인했다.)"""
+    import subprocess as subprocess_module
+
+    def fake_run(cmd, capture_output, text, timeout):
+        assert cmd[1] == ""  # name 필드를 비워 보냈다는 뜻
+        derived = "Some_Video_Title"
+        movie_dir = tmp_path / derived
+        movie_dir.mkdir(parents=True, exist_ok=True)
+        (movie_dir / "audio.mp3").write_bytes(b"fake")
+        return subprocess_module.CompletedProcess(cmd, 0, stdout=f"ok\nMOVIE={derived}\n", stderr="")
+
+    monkeypatch.setattr("app.upload_router.subprocess.run", fake_run)
+
+    resp = client.post(
+        "/api/movies/fetch-youtube",
+        json={"url": "https://www.youtube.com/watch?v=x"},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["movie"] == "Some_Video_Title"
+
+
+def test_fetch_youtube_no_movie_reported(client, monkeypatch):
+    import subprocess as subprocess_module
+
+    def fake_run(cmd, capture_output, text, timeout):
+        return subprocess_module.CompletedProcess(cmd, 0, stdout="ok (no MOVIE= line)", stderr="")
+
+    monkeypatch.setattr("app.upload_router.subprocess.run", fake_run)
+
+    resp = client.post(
+        "/api/movies/fetch-youtube",
+        json={"name": "yt_movie", "url": "https://www.youtube.com/watch?v=x"},
+    )
+    assert resp.status_code == 500
 
 
 def test_fetch_youtube_script_failure(client, monkeypatch):
